@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0B3B66">
+<title>Control de Flota · Demostración</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --primario:#0B3B66; --acento:#C2410C; --acento-suave:#FFEDD5;
+  --fondo:#F1F5F9; --tarjeta:#FFFFFF; --texto:#0F172A; --texto-2:#475569; --borde:#CBD5E1;
+  --wsp:#128C7E;
+  --ok-f:#DCFCE7; --ok-t:#166534;
+  --pv-f:#FEF3C7; --pv-t:#92400E;
+  --ur-f:#FEE2E2; --ur-t:#991B1B;
+  --sr-f:#E2E8F0; --sr-t:#334155;
+  --radio:12px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--fondo);color:var(--texto);font-family:"Source Sans 3",system-ui,sans-serif;font-size:16px;line-height:1.5}
+h1,h2,h3{font-family:Lexend,system-ui,sans-serif;line-height:1.25;margin:0 0 .5rem}
+h1{font-size:1.5rem} h2{font-size:1.2rem} h3{font-size:1.05rem}
+p{margin:0 0 .75rem}
+a{color:var(--primario)}
+button,input,select{font:inherit}
+:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+.num{font-family:Lexend,sans-serif;font-variant-numeric:tabular-nums}
+.ico{width:1.25em;height:1.25em;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Cabecera */
+.top{position:sticky;top:0;z-index:10;background:var(--primario);color:#fff;padding:.6rem 16px;display:flex;align-items:center;gap:.6rem}
+.top .marca{display:flex;align-items:center;gap:.5rem;font-family:Lexend;font-weight:600;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.2rem .65rem;font-size:.85rem;font-weight:600;white-space:nowrap}
+.top .pill{background:rgba(255,255,255,.15);color:#fff}
+.top .pill.off{background:#FDE68A;color:#78350F}
+.demo-banda{background:var(--acento-suave);color:#7C2D12;text-align:center;font-size:.85rem;padding:.3rem 16px;font-weight:600}
+
+main{max-width:1040px;margin:0 auto;padding:16px 16px 96px}
+.tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:var(--radio);padding:16px;margin-bottom:12px}
+.fila{display:flex;align-items:center;gap:.75rem}
+.entre{justify-content:space-between}
+.sec{color:var(--texto-2);font-size:.95rem}
+.grid{display:grid;gap:12px}
+@media (min-width:720px){.grid-2{grid-template-columns:1fr 1fr}.grid-3{grid-template-columns:repeat(3,1fr)}}
+
+/* Botones */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:.6rem 1.1rem;border-radius:10px;border:2px solid var(--primario);background:#fff;color:var(--primario);font-weight:600;cursor:pointer;text-decoration:none;text-align:center}
+.btn.pri{background:var(--primario);color:#fff}
+.btn.cta{background:var(--acento);border-color:var(--acento);color:#fff}
+.btn.wsp{background:var(--wsp);border-color:var(--wsp);color:#fff}
+.btn.grande{min-height:60px;font-size:1.15rem;width:100%}
+.btn.chico{min-height:40px;padding:.35rem .8rem;font-size:.95rem}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.txt{border-color:transparent;background:transparent;padding-left:.25rem;padding-right:.25rem}
+.acciones{display:flex;flex-wrap:wrap;gap:12px}
+
+/* Semáforo */
+.chip{display:inline-flex;align-items:center;gap:.35rem;border-radius:8px;padding:.25rem .6rem;font-weight:600;font-size:.92rem}
+.chip.ok{background:var(--ok-f);color:var(--ok-t)}
+.chip.porvencer{background:var(--pv-f);color:var(--pv-t)}
+.chip.urgente,.chip.vencido{background:var(--ur-f);color:var(--ur-t)}
+.chip.sinreporte{background:var(--sr-f);color:var(--sr-t)}
+.borde-urgente,.borde-vencido{border-left:6px solid var(--ur-t)}
+.borde-porvencer{border-left:6px solid #B45309}
+.borde-sinreporte{border-left:6px solid var(--sr-t)}
+.borde-ok{border-left:6px solid var(--ok-t)}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+@media (min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+.kpi{border-radius:var(--radio);padding:14px;border:1px solid var(--borde);background:#fff;text-align:left;cursor:pointer;display:block;width:100%;color:inherit;text-decoration:none}
+.kpi .n{font-family:Lexend;font-size:2rem;font-weight:700;line-height:1}
+.kpi .l{display:flex;align-items:center;gap:.35rem;font-weight:600;margin-top:.35rem}
+.kpi.ok{background:var(--ok-f);color:var(--ok-t)} .kpi.porvencer{background:var(--pv-f);color:var(--pv-t)}
+.kpi.urgente{background:var(--ur-f);color:var(--ur-t)} .kpi.sinreporte{background:var(--sr-f);color:var(--sr-t)}
+
+/* Lista de camiones */
+.item{display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit}
+.item .cuerpo{flex:1;min-width:0}
+.patente{font-family:Lexend;font-weight:700;font-size:1.2rem;letter-spacing:.04em}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+
+/* Barra de horas */
+.barra{height:14px;border-radius:7px;background:#E2E8F0;overflow:hidden;margin:.4rem 0}
+.barra > span{display:block;height:100%;background:var(--ok-t)}
+.barra.porvencer > span{background:#B45309} .barra.urgente > span,.barra.vencido > span{background:var(--ur-t)}
+
+/* Formularios */
+label.campo{display:block;font-weight:600;margin-bottom:12px}
+label.campo input,label.campo select{display:block;width:100%;margin-top:.3rem;min-height:48px;padding:.5rem .75rem;border:2px solid var(--borde);border-radius:10px;background:#fff;color:var(--texto)}
+.input-grande{font-family:Lexend;font-size:2rem !important;text-align:center;min-height:72px !important;font-variant-numeric:tabular-nums}
+.error{color:var(--ur-t);background:var(--ur-f);border-radius:8px;padding:.6rem .8rem;font-weight:600;margin:.5rem 0}
+.ayuda{color:var(--texto-2);font-size:.92rem;font-weight:400}
+
+/* Operador: letra más grande */
+.vista-op{font-size:18px}
+.paso{font-weight:700;color:var(--acento);font-family:Lexend}
+.foto-prev{width:100%;max-height:260px;object-fit:contain;border-radius:10px;border:1px solid var(--borde);background:#0F172A}
+.listo{text-align:center;padding:24px 8px}
+.listo .circulo{width:96px;height:96px;border-radius:50%;background:var(--ok-f);color:var(--ok-t);display:grid;place-items:center;margin:0 auto 16px}
+.listo .circulo .ico{width:56px;height:56px}
+
+/* Tabla */
+.tabla-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.95rem}
+th,td{text-align:left;padding:.5rem .4rem;border-bottom:1px solid var(--borde);vertical-align:middle}
+th{color:var(--texto-2);font-weight:600}
+.mini-foto{width:48px;height:36px;object-fit:cover;border-radius:6px;background:#0F172A}
+
+/* Mensaje WhatsApp */
+.burbuja{background:#E7FFDB;border-radius:12px;padding:12px 14px;white-space:pre-wrap;font-size:.95rem;border:1px solid #BBE5A7}
+
+/* Inicio */
+.perfil{display:flex;gap:14px;align-items:flex-start;text-decoration:none;color:inherit;cursor:pointer}
+.perfil .ic{width:52px;height:52px;border-radius:12px;background:var(--primario);color:#fff;display:grid;place-items:center;flex:none}
+.perfil .ic .ico{width:28px;height:28px}
+.pasos{counter-reset:p;list-style:none;padding:0;margin:0}
+.pasos li{counter-increment:p;display:flex;gap:12px;margin-bottom:12px}
+.pasos li::before{content:counter(p);flex:none;width:32px;height:32px;border-radius:50%;background:var(--acento);color:#fff;display:grid;place-items:center;font-family:Lexend;font-weight:700}
+
+/* Navegación inferior */
+.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--borde);display:flex;justify-content:center;z-index:10;padding-bottom:env(safe-area-inset-bottom)}
+.nav a{flex:1;max-width:140px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:.5rem .25rem;min-height:60px;color:var(--texto-2);text-decoration:none;font-size:.8rem;font-weight:600}
+.nav a[aria-current="page"]{color:var(--primario);box-shadow:inset 0 3px 0 var(--acento)}
+.nav .ico{width:24px;height:24px}
+.badge{background:var(--ur-t);color:#fff;border-radius:999px;font-size:.72rem;padding:0 .4rem;margin-left:2px}
+
+.toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);background:var(--texto);color:#fff;padding:.7rem 1.1rem;border-radius:10px;font-weight:600;z-index:20;max-width:calc(100% - 32px);text-align:center}
+.vacio{text-align:center;color:var(--texto-2);padding:24px}
+.filtros{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
+.filtros .btn{flex:none}
+.filtros .btn[aria-pressed="true"]{background:var(--primario);color:#fff}
+.graf{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:8px}
+.graf span{flex:1;background:var(--primario);border-radius:3px 3px 0 0;min-height:2px}
+.graf-ejes{display:flex;justify-content:space-between;color:var(--texto-2);font-size:.8rem}
+@media (prefers-reduced-motion:no-preference){.btn,.kpi{transition:filter .15s}.btn:hover,.kpi:hover{filter:brightness(.95)}}
+@media print{.top,.nav,.demo-banda,.no-print{display:none !important}main{padding:0}.tarjeta{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="marca" href="#inicio"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg>Control de Flota</a>
+  <span id="estadoRed" class="pill"></span>
+</header>
+<div class="demo-banda">Demostración · todos los datos son de ejemplo</div>
+<main id="app"></main>
+<nav class="nav" id="nav" hidden></nav>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<!-- Iconos (estilo Lucide) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/></symbol>
+  <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></symbol>
+  <symbol id="i-send" viewBox="0 0 24 24"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></symbol>
+</svg>
+
+<script>
+'use strict';
+/* ============ Utilidades ============ */
+const DIA = 86400000;
+const $ = (s, el = document) => el.querySelector(s);
+const ic = (id, extra = '') => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true" ${extra}><use href="#i-${id}"/></svg>`;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const n0 = v => Math.round(v).toLocaleString('es-CL');
+const n1 = v => Number(v).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+const hoy0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const fecha = d => new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const fechaCorta = d => new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
+const hora = d => new Date(d).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
+const diasHasta = d => Math.round((new Date(d).setHours(0, 0, 0, 0) - hoy0()) / DIA);
+const fmtPatente = p => String(p).toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]{2})([A-Z0-9]{2})([0-9]{2})$/, '$1·$2·$3');
+function cuando(d) {
+  const dd = -diasHasta(d);
+  if (dd === 0) return 'hoy ' + hora(d);
+  if (dd === 1) return 'ayer ' + hora(d);
+  return 'hace ' + dd + ' días';
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.hidden = true, 3200);
+}
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+/* Foto de ejemplo: dibujo de un horómetro con la lectura */
+function fotoEjemplo(valor) {
+  const txt = n1(valor).padStart(7, ' ');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200"><rect width="320" height="200" fill="#1f2937"/><rect x="30" y="40" width="260" height="120" rx="14" fill="#0b0f14" stroke="#64748b" stroke-width="4"/><text x="160" y="72" fill="#94a3b8" font-family="Arial" font-size="16" text-anchor="middle">HORAS</text><text x="160" y="130" fill="#fbbf24" font-family="Courier New,monospace" font-size="44" font-weight="bold" text-anchor="middle">${txt}</text></svg>`;
+  return 'data:image/svg+xml,' + encodeURIComponent(svg);
+}
+
+/* ============ Datos de ejemplo ============ */
+const CLAVE = 'flota-demo-v2';
+function crearDemo() {
+  const r = rng(7);
+  const base = hoy0().getTime();
+  const usuarios = [
+    { id: 'u1', nombre: 'Juan Pérez', rol: 'operador' },
+    { id: 'u2', nombre: 'Luis Soto', rol: 'operador' },
+    { id: 'u3', nombre: 'Marta Rojas', rol: 'supervisor' },
+    { id: 'u4', nombre: 'Administración', rol: 'administrador' }
+  ];
+  // [patente, tipo, modelo, operador, límite h, % usado, días a la RT, días sin registro]
+  // Un camión por caso: RT vencida, RT + horas por vencer, horas urgentes, sin reporte y al día
+  const defs = [
+    ['KDLP21', 'Camión tolva', 'Volvo FMX 460', 'u2', 12000, 0.62, -3, 1],
+    ['JHRT45', 'Camión aljibe', 'Mercedes-Benz Actros', 'u1', 10000, 0.86, 18, 1],
+    ['GFTS12', 'Camión tolva', 'Volvo FMX 460', 'u2', 10000, 0.963, 120, 1],
+    ['PRDW77', 'Camión rampla', 'Scania G410', 'u1', 12000, 0.41, 210, 4],
+    ['KTVB09', 'Camión tolva', 'Volvo FMX 460', 'u1', 12000, 0.35, 95, 1]
+  ];
+  const camiones = defs.map((d, i) => {
+    const [patente, tipo, modelo, operador, limite, pct, diasRT, sinReg] = d;
+    const uso = 7 + r() * 4; // horas de motor promedio por día hábil
+    const incs = [];
+    for (let k = 30; k >= sinReg; k--) {
+      const f = new Date(base - k * DIA);
+      const domingo = f.getDay() === 0;
+      incs.push({ f: f.getTime() + (17 * 60 + Math.floor(r() * 120)) * 60000, h: domingo ? 0 : Math.round(uso * (0.7 + r() * 0.5) * 10) / 10 });
+    }
+    const total = incs.reduce((s, x) => s + x.h, 0);
+    let valor = Math.round((limite * pct - total) * 10) / 10;
+    const lecturas = incs.map((x, j) => {
+      valor = Math.round((valor + x.h) * 10) / 10;
+      const ultima = j === incs.length - 1;
+      return {
+        id: 'l' + i + '-' + j, fecha: x.f, valor, usuario: operador, foto: true,
+        estado: ultima && i % 3 !== 0 ? 'pendiente' : 'validado', sync: 'enviado'
+      };
+    });
+    if (i === 2) { const l = lecturas[lecturas.length - 2]; l.estado = 'observado'; l.nota = 'La foto está borrosa, no se lee el número.'; }
+    return {
+      id: 'c' + (i + 1), patente, tipo, modelo, operador, limite,
+      rtVence: new Date(base + diasRT * DIA).toISOString().slice(0, 10), lecturas
+    };
+  });
+  return {
+    creado: Date.now(), rol: null, sinSenalDemo: false,
+    config: { empresa: 'Transportes Ejemplo', diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, wsp: '', correo: '' },
+    usuarios, camiones
+  };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
+if (!S || !S.camiones) S = crearDemo();
+function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ } }
+
+/* ============ Reglas de negocio ============ */
+const usuario = id => S.usuarios.find(u => u.id === id) || { nombre: '—' };
+const camion = id => S.camiones.find(c => c.id === id);
+const lecturasOk = c => c.lecturas.filter(l => l.sync === 'enviado');
+const ultima = (c, todas) => { const ls = todas ? c.lecturas : lecturasOk(c); return ls[ls.length - 1]; };
+const RANGO = { vencido: 4, urgente: 3, porvencer: 2, sinreporte: 1, ok: 0 };
+
+function estadoRT(c) {
+  const d = diasHasta(c.rtVence + 'T12:00');
+  let e = 'ok', txt = `Vence en ${d} días`;
+  if (d < 0) { e = 'vencido'; txt = `Vencida hace ${-d} ${-d === 1 ? 'día' : 'días'}`; }
+  else if (d === 0) { e = 'vencido'; txt = 'Vence hoy'; }
+  else if (d <= S.config.diasUrgente) e = 'urgente';
+  else if (d <= S.config.diasPorVencer) e = 'porvencer';
+  if (d === 1) txt = 'Vence mañana';
+  return { e, d, txt };
+}
+function promedioDiario(c) {
+  const ls = lecturasOk(c); if (ls.length < 2) return 0;
+  const desde = Date.now() - 14 * DIA;
+  const rec = ls.filter(l => l.fecha >= desde);
+  const a = rec.length ? ls[Math.max(0, ls.indexOf(rec[0]) - 1)] : ls[0];
+  const b = ls[ls.length - 1];
+  const dias = Math.max(1, (b.fecha - a.fecha) / DIA);
+  return (b.valor - a.valor) / dias;
+}
+function estadoHoras(c) {
+  const u = ultima(c); const actual = u ? u.valor : 0;
+  const pct = actual / c.limite * 100;
+  const prom = promedioDiario(c);
+  const resta = c.limite - actual;
+  const dias = prom > 0 ? Math.ceil(resta / prom) : null;
+  let e = 'ok';
+  if (pct >= 100) e = 'vencido'; else if (pct >= S.config.pctUrgente) e = 'urgente'; else if (pct >= S.config.pctAviso) e = 'porvencer';
+  const fechaLim = dias != null ? new Date(Date.now() + dias * DIA) : null;
+  const txt = pct >= 100 ? 'Límite superado' : `${Math.floor(pct)}% del límite`;
+  return { e, actual, pct, prom, resta, dias, fechaLim, txt };
+}
+function sinReporte(c) {
+  const u = ultima(c); if (!u) return { si: true, dias: null };
+  const dias = -diasHasta(u.fecha);
+  return { si: dias > S.config.diasSinReporte, dias };
+}
+function estadoGeneral(c) {
+  const a = estadoRT(c).e, b = estadoHoras(c).e;
+  let e = RANGO[a] >= RANGO[b] ? a : b;
+  if (e === 'ok' && sinReporte(c).si) e = 'sinreporte';
+  return e;
+}
+const ordenUrgencia = (a, b) => RANGO[estadoGeneral(b)] - RANGO[estadoGeneral(a)] || estadoRT(a).d - estadoRT(b).d;
+const ETQ = { ok: 'Al día', porvencer: 'Por vencer', urgente: 'Urgente', vencido: 'Vencido', sinreporte: 'Sin reporte' };
+const ICO = { ok: 'check', porvencer: 'clock', urgente: 'alert', vencido: 'alert', sinreporte: 'wifi-off' };
+const chip = (e, txt) => `<span class="chip ${e}">${ic(ICO[e])}${esc(txt)}</span>`;
+
+/* ============ Red / sin señal ============ */
+const enLinea = () => navigator.onLine && !S.sinSenalDemo;
+function pintarRed() {
+  const el = $('#estadoRed');
+  const cola = S.camiones.reduce((s, c) => s + c.lecturas.filter(l => l.sync === 'cola').length, 0);
+  if (enLinea()) { el.className = 'pill'; el.innerHTML = ic('wifi') + 'En línea'; }
+  else { el.className = 'pill off'; el.innerHTML = ic('wifi-off') + 'Sin señal' + (cola ? ` · ${cola} por enviar` : ''); }
+}
+function sincronizar() {
+  if (!enLinea()) return;
+  let n = 0;
+  S.camiones.forEach(c => c.lecturas.forEach(l => { if (l.sync === 'cola') { l.sync = 'enviado'; n++; } }));
+  if (n) { guardar(); toast(`Volvió la señal: ${n === 1 ? 'se envió 1 registro' : `se enviaron ${n} registros`}`); }
+  pintarRed();
+}
+addEventListener('online', () => { sincronizar(); render(); });
+addEventListener('offline', () => { pintarRed(); render(); });
+
+/* ============ Navegación ============ */
+const NAV = {
+  operador: [['operador', 'home', 'Mis camiones']],
+  supervisor: [['resumen', 'home', 'Resumen'], ['camiones', 'truck', 'Camiones'], ['registros', 'clipboard', 'Registros'], ['avisos', 'bell', 'Avisos']],
+  administrador: [['resumen', 'home', 'Resumen'], ['camiones', 'truck', 'Camiones'], ['registros', 'clipboard', 'Registros'], ['avisos', 'bell', 'Avisos'], ['ajustes', 'sliders', 'Ajustes']]
+};
+function pintarNav(ruta) {
+  const nav = $('#nav');
+  if (!S.rol || S.rol === 'operador' || ruta === 'inicio') { nav.hidden = true; return; }
+  const pend = S.camiones.reduce((s, c) => s + lecturasOk(c).filter(l => l.estado === 'pendiente').length, 0);
+  const base = { camion: 'camiones', editar: 'ajustes' }[ruta] || ruta;
+  nav.innerHTML = NAV[S.rol].map(([r, i, t]) =>
+    `<a href="#${r}" ${base === r ? 'aria-current="page"' : ''}>${ic(i)}<span>${t}${r === 'registros' && pend ? ` <span class="badge">${pend}</span>` : ''}</span></a>`).join('');
+  nav.hidden = false;
+}
+function render() {
+  const [ruta, arg] = (location.hash.slice(1) || 'inicio').split('/');
+  const [r, q] = ruta.split('?');
+  const vistas = { inicio: vInicio, operador: vOperador, registrar: vRegistrar, resumen: vResumen, camiones: vCamiones, camion: vCamion, registros: vRegistros, avisos: vAvisos, ajustes: vAjustes, editar: vEditar };
+  const app = $('#app');
+  app.className = (r === 'operador' || r === 'registrar') ? 'vista-op' : '';
+  app.innerHTML = (vistas[r] || vInicio)(arg, new URLSearchParams(q || ''));
+  pintarNav(r); pintarRed();
+  const h = app.querySelector('h1'); if (h && render.mover) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  render.mover = false;
+}
+addEventListener('hashchange', () => { render.mover = true; scrollTo(0, 0); render(); });
+function ir(h) { location.hash = h; }
+const volver = (href, txt) => `<a class="btn txt no-print" href="${href}">${ic('back')}${txt}</a>`;
+
+/* ============ Vista: Inicio (elegir perfil) ============ */
+function vInicio() {
+  const p = (rol, i, t, d) => `<button class="tarjeta perfil" style="width:100%;text-align:left;font:inherit" onclick="elegirRol('${rol}')">
+    <span class="ic">${ic(i)}</span><span><h2>${t}</h2><span class="sec">${d}</span></span></button>`;
+  return `
+  <h1>Control de horómetros y revisiones técnicas</h1>
+  <p class="sec">Elige un perfil para ver cómo funciona la app desde cada lado. Puedes cambiar de perfil cuando quieras tocando "Control de Flota" arriba.</p>
+  <div class="grid grid-3">
+    ${p('operador', 'user', 'Operador', 'Está en terreno. Registra el horómetro con una foto, incluso sin señal.')}
+    ${p('supervisor', 'clipboard', 'Supervisor', 'Revisa las alertas, valida los registros y envía los avisos.')}
+    ${p('administrador', 'sliders', 'Administrador', 'Configura la flota, los límites, las fechas y a quién avisar.')}
+  </div>
+  <div class="tarjeta">
+    <h2>Cómo funciona</h2>
+    <ol class="pasos">
+      <li><span><b>El operador anota el horómetro</b> desde su celular con una foto. Si no hay señal, se guarda y se envía solo al volver la señal.</span></li>
+      <li><span><b>La app revisa el número</b>: no puede bajar ni subir más horas de las que pasaron.</span></li>
+      <li><span><b>El panel muestra un semáforo</b> con las revisiones técnicas por vencer y los camiones cerca de su límite de horas.</span></li>
+      <li><span><b>Se avisa por WhatsApp o correo</b> lo que está por vencer, antes de que sea un problema.</span></li>
+    </ol>
+  </div>
+  <button class="btn" onclick="reiniciar()">Reiniciar datos de ejemplo</button>`;
+}
+function elegirRol(rol) { S.rol = rol; guardar(); ir(rol === 'operador' ? 'operador' : 'resumen'); }
+function reiniciar() { if (confirm('¿Volver a los datos de ejemplo originales? Se pierden los cambios de la demostración.')) { S = crearDemo(); guardar(); render(); toast('Datos de ejemplo reiniciados'); } }
+
+/* ============ Vista: Operador ============ */
+const OP_ID = 'u1';
+function vOperador() {
+  const mios = S.camiones.filter(c => c.operador === OP_ID);
+  const cola = mios.reduce((s, c) => s + c.lecturas.filter(l => l.sync === 'cola').length, 0);
+  return `
+  <h1>Hola, ${esc(usuario(OP_ID).nombre.split(' ')[0])}</h1>
+  <p class="sec">Toca <b>Registrar horómetro</b> en el camión que estás usando.</p>
+  ${!enLinea() ? `<div class="tarjeta" style="background:#FEF3C7;border-color:#F59E0B"><div class="fila">${ic('wifi-off')}<b>Estás sin señal.</b></div><p style="margin:.4rem 0 0">Puedes registrar igual: se guarda en el celular y se envía solo cuando vuelva la señal.${cola ? ` <b>${cola} por enviar.</b>` : ''}</p></div>` : ''}
+  ${mios.map(c => {
+    const u = ultima(c, true); const sr = sinReporte(c); const hoyYa = u && diasHasta(u.fecha) === 0;
+    return `<div class="tarjeta ${hoyYa ? 'borde-ok' : sr.si ? 'borde-porvencer' : ''}">
+      <div class="fila entre"><span class="patente">${fmtPatente(c.patente)}</span>${hoyYa ? chip('ok', 'Hoy listo') : sr.si ? chip('porvencer', `${sr.dias} días sin registrar`) : ''}</div>
+      <div class="sec">${esc(c.tipo)} · ${esc(c.modelo)}</div>
+      <p style="margin:.5rem 0">Última lectura: <b class="num">${u ? n1(u.valor) + ' h' : '—'}</b> <span class="sec">(${u ? cuando(u.fecha) : 'sin registros'})</span>
+      ${u && u.sync === 'cola' ? '<br><span class="chip sinreporte">' + ic('wifi-off') + 'Guardado, se enviará al volver la señal</span>' : ''}</p>
+      <a class="btn cta grande" href="#registrar/${c.id}">${ic('gauge')}Registrar horómetro</a>
+    </div>`;
+  }).join('')}
+  <div class="tarjeta no-print">
+    <h3>Probar sin señal (solo demostración)</h3>
+    <p class="sec">Simula que estás en una zona sin cobertura para ver cómo se guardan los registros.</p>
+    <button class="btn" onclick="toggleSenal()">${S.sinSenalDemo ? ic('wifi') + 'Volver a tener señal' : ic('wifi-off') + 'Simular sin señal'}</button>
+  </div>`;
+}
+function toggleSenal() { S.sinSenalDemo = !S.sinSenalDemo; guardar(); if (enLinea()) sincronizar(); render(); }
+
+/* Registro en 3 pasos: lectura → foto → confirmar */
+let REG = null;
+function vRegistrar(id) {
+  const c = camion(id); if (!c) return vOperador();
+  if (!REG || REG.id !== id) REG = { id, paso: 1, valor: '', foto: null, error: '' };
+  const u = ultima(c, true);
+  const cab = `${volver('#operador', 'Volver')}
+    <div class="paso">Paso ${REG.paso} de 3</div>
+    <h1>${fmtPatente(c.patente)} <span class="sec" style="font-size:1rem">${esc(c.tipo)}</span></h1>`;
+  if (REG.done) return `<div class="listo">
+      <div class="circulo">${ic('check')}</div>
+      <h1>Listo, quedó guardado</h1>
+      <p><b class="num" style="font-size:1.6rem">${n1(REG.valor)} h</b><br>${fmtPatente(c.patente)} · ${hora(Date.now())}</p>
+      <p class="sec">${REG.offline ? 'Estás sin señal: se enviará solo cuando vuelva la señal. No tienes que hacer nada más.' : 'Ya se envió a la oficina. No tienes que hacer nada más.'}</p>
+      <a class="btn pri grande" href="#operador" onclick="REG=null">Terminar</a></div>`;
+  if (REG.paso === 1) return `${cab}
+    <div class="tarjeta">
+      <label class="campo">¿Qué número marca el horómetro?
+        <input id="lect" class="input-grande" inputmode="decimal" autocomplete="off" value="${esc(REG.valor)}" aria-describedby="ayudaLect">
+      </label>
+      <p id="ayudaLect" class="ayuda">La última vez marcaba <b class="num">${u ? n1(u.valor) : '—'} h</b> (${u ? cuando(u.fecha) : 'sin registros'}). El número nuevo debe ser igual o mayor.</p>
+      ${REG.error ? `<div class="error" role="alert">${REG.error}</div>` : ''}
+      <button class="btn cta grande" onclick="paso1('${id}')">Siguiente</button>
+    </div>`;
+  if (REG.paso === 2) return `${cab}
+    <div class="tarjeta">
+      <h2>Saca una foto al horómetro</h2>
+      <p class="sec">Que se vea bien el número. La foto sirve de respaldo.</p>
+      ${REG.foto ? `<img class="foto-prev" src="${REG.foto}" alt="Foto del horómetro">` : ''}
+      <label class="btn ${REG.foto ? '' : 'cta'} grande" style="margin:12px 0">${ic('camera')}${REG.foto ? 'Sacar otra foto' : 'Tomar foto'}
+        <input type="file" accept="image/*" capture="environment" hidden onchange="cargarFoto(this)"></label>
+      <button class="btn txt" onclick="REG.foto=fotoEjemplo(REG.valor);render()">Usar foto de ejemplo (demostración)</button>
+      ${REG.error ? `<div class="error" role="alert">${REG.error}</div>` : ''}
+      <div class="acciones" style="margin-top:12px"><button class="btn" onclick="REG.paso=1;REG.error='';render()">Atrás</button>
+      <button class="btn pri" style="flex:1" onclick="paso2()">Siguiente</button></div>
+    </div>`;
+  const dif = u ? REG.valor - u.valor : 0;
+  return `${cab}
+    <div class="tarjeta">
+      <h2>Revisa que esté bien</h2>
+      <p style="font-size:1.1rem">Horómetro: <b class="num" style="font-size:1.8rem">${n1(REG.valor)} h</b></p>
+      ${u ? `<p class="sec">${n1(dif)} horas más que la última vez.</p>` : ''}
+      <img class="foto-prev" src="${REG.foto}" alt="Foto del horómetro">
+      <div class="acciones" style="margin-top:12px"><button class="btn" onclick="REG.paso=2;render()">Atrás</button>
+      <button class="btn cta" style="flex:1" onclick="guardarRegistro()">${ic('check')}Guardar</button></div>
+    </div>`;
+}
+function paso1(id) {
+  const c = camion(id); const u = ultima(c, true);
+  const raw = $('#lect').value.trim().replace(/\./g, '').replace(',', '.');
+  const v = Number(raw);
+  REG.valor = $('#lect').value; REG.error = '';
+  if (!raw || isNaN(v) || v <= 0) REG.error = 'Escribe el número del horómetro, solo con números.';
+  else if (u && v < u.valor) REG.error = `El número es menor que la última vez (${n1(u.valor)} h). El horómetro nunca baja: revisa que esté bien escrito.`;
+  else if (u) {
+    const pasaron = (Date.now() - u.fecha) / 3600000;
+    if (v - u.valor > pasaron + 0.5) REG.error = `Son ${n1(v - u.valor)} horas más que la última vez, pero desde entonces solo han pasado ${n1(pasaron)} horas. Revisa el número.`;
+  }
+  if (!REG.error) { REG.valor = v; REG.paso = 2; }
+  render();
+}
+function cargarFoto(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const img = new Image(); const url = URL.createObjectURL(f);
+  img.onload = () => { // se achica para no llenar la memoria del celular
+    const k = Math.min(1, 640 / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = img.width * k; cv.height = img.height * k;
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    REG.foto = cv.toDataURL('image/jpeg', 0.7); REG.error = ''; URL.revokeObjectURL(url); render();
+  };
+  img.src = url;
+}
+function paso2() { if (!REG.foto) { REG.error = 'Falta la foto. Toca "Tomar foto".'; render(); return; } REG.error = ''; REG.paso = 3; render(); }
+function guardarRegistro() {
+  const c = camion(REG.id);
+  const offline = !enLinea();
+  c.lecturas.push({ id: 'l' + Date.now(), fecha: Date.now(), valor: REG.valor, usuario: OP_ID, foto: true, img: REG.foto.length < 120000 ? REG.foto : null, estado: 'pendiente', sync: offline ? 'cola' : 'enviado' });
+  guardar(); REG.done = true; REG.offline = offline; render();
+}
+
+/* ============ Vista: Resumen (supervisor / administrador) ============ */
+function vResumen() {
+  const cs = S.camiones;
+  const cnt = e => cs.filter(c => { const g = estadoGeneral(c); return e === 'urgente' ? (g === 'urgente' || g === 'vencido') : g === e; }).length;
+  const sr = cs.filter(c => sinReporte(c).si).length;
+  const lista = cs.filter(c => estadoGeneral(c) !== 'ok').sort(ordenUrgencia);
+  const k = (e, n, t, f) => `<a class="kpi ${e}" href="#camiones?f=${f}"><div class="n num">${n}</div><div class="l">${ic(ICO[e])}${t}</div></a>`;
+  return `
+  <div class="fila entre" style="flex-wrap:wrap"><h1 style="margin:0">Resumen de la flota</h1>
+    <div class="acciones no-print"><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button><button class="btn chico" onclick="print()">${ic('printer')}PDF</button></div></div>
+  <p class="sec">${esc(S.config.empresa)} · ${cs.length} camiones · ${fecha(Date.now())}</p>
+  <div class="kpis">
+    ${k('urgente', cnt('urgente'), 'Urgentes o vencidos', 'urgente')}
+    ${k('porvencer', cnt('porvencer'), 'Por vencer', 'porvencer')}
+    ${k('sinreporte', sr, 'Sin reporte', 'sinreporte')}
+    ${k('ok', cnt('ok'), 'Al día', 'ok')}
+  </div>
+  <div class="fila entre"><h2 style="margin:0">Requieren atención</h2><a class="btn chico cta no-print" href="#avisos">${ic('send')}Avisar</a></div>
+  <p class="sec">Ordenados del más urgente al menos urgente.</p>
+  ${lista.length ? lista.map(filaCamion).join('') : '<div class="tarjeta vacio">Todo al día. No hay nada por vencer.</div>'}`;
+}
+function filaCamion(c) {
+  const g = estadoGeneral(c), rt = estadoRT(c), h = estadoHoras(c), sr = sinReporte(c);
+  return `<a class="tarjeta item borde-${g}" href="#camion/${c.id}">
+    <div class="cuerpo">
+      <div class="fila entre"><span class="patente">${fmtPatente(c.patente)}</span><span class="sec" style="font-size:.9rem">${esc(c.tipo)}</span></div>
+      <div class="chips">
+        ${chip(rt.e, 'Rev. técnica: ' + rt.txt)}
+        ${chip(h.e, 'Horas: ' + h.txt + (h.e !== 'ok' && h.fechaLim && h.pct < 100 ? ' · límite aprox. ' + fechaCorta(h.fechaLim) : ''))}
+        ${sr.si ? chip('sinreporte', sr.dias == null ? 'Sin registros' : `${sr.dias} días sin reporte`) : ''}
+      </div>
+    </div>${ic('chevron')}</a>`;
+}
+
+/* ============ Vista: Camiones ============ */
+function vCamiones(_, q) {
+  const f = q.get('f') || 'todos';
+  const filtros = [['todos', 'Todos'], ['urgente', 'Urgentes'], ['porvencer', 'Por vencer'], ['sinreporte', 'Sin reporte'], ['ok', 'Al día']];
+  const pasa = c => { const g = estadoGeneral(c); if (f === 'todos') return true; if (f === 'urgente') return g === 'urgente' || g === 'vencido'; if (f === 'sinreporte') return sinReporte(c).si; return g === f; };
+  const lista = S.camiones.filter(pasa).sort(ordenUrgencia);
+  return `
+  <div class="fila entre"><h1 style="margin:0">Camiones</h1>${S.rol === 'administrador' ? `<a class="btn chico" href="#editar/nuevo">${ic('plus')}Agregar</a>` : ''}</div>
+  <p class="sec">${lista.length} de ${S.camiones.length} camiones</p>
+  <div class="filtros" role="group" aria-label="Filtrar por estado">${filtros.map(([k, t]) => `<a class="btn chico" href="#camiones?f=${k}" aria-pressed="${f === k}">${t}</a>`).join('')}</div>
+  ${lista.length ? lista.map(filaCamion).join('') : '<div class="tarjeta vacio">No hay camiones con este estado.</div>'}`;
+}
+
+/* ============ Vista: Detalle de camión ============ */
+function vCamion(id) {
+  const c = camion(id); if (!c) return vCamiones(null, new URLSearchParams());
+  const rt = estadoRT(c), h = estadoHoras(c), sr = sinReporte(c);
+  const ls = lecturasOk(c);
+  // horas trabajadas por día en los últimos 14 días
+  const dias = []; for (let k = 13; k >= 0; k--) { const d0 = hoy0().getTime() - k * DIA; dias.push({ d0, h: 0 }); }
+  ls.forEach((l, i) => { if (!i) return; const dd = dias.find(x => l.fecha >= x.d0 && l.fecha < x.d0 + DIA); if (dd) dd.h += l.valor - ls[i - 1].valor; });
+  const max = Math.max(12, ...dias.map(x => x.h));
+  const puedeValidar = S.rol !== 'operador';
+  return `
+  ${volver('#camiones', 'Camiones')}
+  <div class="fila entre" style="flex-wrap:wrap"><h1 style="margin:0" class="patente">${fmtPatente(c.patente)}</h1>${chip(estadoGeneral(c), ETQ[estadoGeneral(c)])}</div>
+  <p class="sec">${esc(c.tipo)} · ${esc(c.modelo)} · Operador: ${esc(usuario(c.operador).nombre)}</p>
+  <div class="grid grid-2">
+    <div class="tarjeta borde-${rt.e}">
+      <h2>Revisión técnica</h2>
+      <p style="margin:0">Vence el <b>${fecha(c.rtVence + 'T12:00')}</b></p>
+      <div class="chips" style="margin:.5rem 0 .75rem">${chip(rt.e, rt.txt)}</div>
+      <a class="btn chico" href="#" onclick="toast('En la versión real aquí se abre el certificado (PDF o foto).');return false">${ic('file')}Ver certificado</a>
+    </div>
+    <div class="tarjeta borde-${h.e}">
+      <h2>Horómetro</h2>
+      <p style="margin:0"><b class="num" style="font-size:1.5rem">${n1(h.actual)} h</b> <span class="sec">de ${n0(c.limite)} h de límite</span></p>
+      <div class="barra ${h.e}" role="img" aria-label="${Math.floor(h.pct)}% del límite usado"><span style="width:${Math.min(100, h.pct)}%"></span></div>
+      <div class="chips" style="margin-bottom:.5rem">${chip(h.e, h.txt)}</div>
+      <p class="sec" style="margin:0">Usa en promedio <b>${n1(h.prom)} h por día</b>. ${h.pct >= 100 ? 'Ya superó el límite.' : h.dias != null ? `Le quedan <b>${n0(h.resta)} h</b>: llegaría al límite cerca del <b>${fecha(h.fechaLim)}</b> (en ${h.dias} días).` : 'Sin uso reciente para proyectar.'}</p>
+    </div>
+  </div>
+  <div class="tarjeta">
+    <h2>Horas de motor por día</h2>
+    <p class="sec" style="margin:0">Últimos 14 días${sr.si ? ` · <b>${sr.dias} días sin reporte</b>` : ''}</p>
+    <div class="graf" role="img" aria-label="Gráfico de horas por día, últimos 14 días">${dias.map(x => `<span style="height:${x.h / max * 100}%" title="${fechaCorta(x.d0)}: ${n1(x.h)} h"></span>`).join('')}</div>
+    <div class="graf-ejes"><span>${fechaCorta(dias[0].d0)}</span><span>hoy</span></div>
+  </div>
+  <div class="acciones no-print" style="margin-bottom:12px">
+    <a class="btn wsp" target="_blank" rel="noopener" href="${linkWsp(mensajeCamion(c))}">${ic('send')}Avisar por WhatsApp</a>
+    ${S.rol === 'administrador' ? `<a class="btn" href="#editar/${c.id}">${ic('sliders')}Editar datos</a>` : ''}
+  </div>
+  <div class="tarjeta">
+    <h2>Registros</h2>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Lectura</th><th>Foto</th><th>Estado</th></tr></thead>
+      <tbody>${ls.slice(-10).reverse().map(l => `<tr>
+        <td>${fechaCorta(l.fecha)} ${hora(l.fecha)}<br><span class="sec">${esc(usuario(l.usuario).nombre)}</span></td>
+        <td class="num">${n1(l.valor)}</td>
+        <td><img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)}"></td>
+        <td>${celdaEstado(l, c.id, puedeValidar)}</td></tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+function celdaEstado(l, cid, puede) {
+  if (l.estado === 'validado') return chip('ok', 'Validado');
+  if (l.estado === 'observado') return chip('urgente', 'Observado') + (l.nota ? `<div class="sec" style="font-size:.85rem">${esc(l.nota)}</div>` : '');
+  return chip('porvencer', 'Por validar') + (puede ? `<div class="acciones" style="gap:6px;margin-top:6px"><button class="btn chico pri" onclick="validar('${cid}','${l.id}',true)">Validar</button><button class="btn chico" onclick="validar('${cid}','${l.id}',false)">Observar</button></div>` : '');
+}
+function validar(cid, lid, ok) {
+  const l = camion(cid).lecturas.find(x => x.id === lid);
+  if (ok) { l.estado = 'validado'; toast('Registro validado'); }
+  else { const nota = prompt('¿Qué tiene de malo este registro? (le llegará al operador)', 'No se lee bien el número en la foto.'); if (nota === null) return; l.estado = 'observado'; l.nota = nota; toast('Registro observado'); }
+  guardar(); render();
+}
+
+/* ============ Vista: Registros por validar ============ */
+function vRegistros() {
+  const pend = [];
+  S.camiones.forEach(c => { const ls = lecturasOk(c); ls.forEach((l, i) => { if (l.estado === 'pendiente') pend.push({ c, l, ant: ls[i - 1] }); }); });
+  pend.sort((a, b) => b.l.fecha - a.l.fecha);
+  return `
+  <h1>Registros por validar</h1>
+  <p class="sec">Compara el número con la foto. Si está bien, toca <b>Validar</b>.</p>
+  ${pend.length ? pend.map(({ c, l, ant }) => `<div class="tarjeta">
+    <div class="fila entre"><a class="patente" href="#camion/${c.id}">${fmtPatente(c.patente)}</a><span class="sec">${cuando(l.fecha)}</span></div>
+    <div class="fila" style="margin:.6rem 0;align-items:flex-start">
+      <img src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro" style="width:120px;border-radius:8px;flex:none">
+      <div><div class="num" style="font-size:1.4rem;font-weight:700">${n1(l.valor)} h</div>
+      <div class="sec">${ant ? `+${n1(l.valor - ant.valor)} h desde ${cuando(ant.fecha)}` : 'Primer registro'}</div>
+      <div class="sec">${esc(usuario(l.usuario).nombre)}</div></div>
+    </div>
+    <div class="acciones"><button class="btn pri" style="flex:1" onclick="validar('${c.id}','${l.id}',true)">${ic('check')}Validar</button><button class="btn" onclick="validar('${c.id}','${l.id}',false)">Observar</button></div>
+  </div>`).join('') : '<div class="tarjeta vacio">No hay registros por validar.</div>'}`;
+}
+
+/* ============ Avisos (WhatsApp / correo) ============ */
+function itemsAviso() {
+  const rt = [], hs = [], sr = [];
+  S.camiones.slice().sort(ordenUrgencia).forEach(c => {
+    const a = estadoRT(c), h = estadoHoras(c), s = sinReporte(c), p = `${fmtPatente(c.patente)} (${c.tipo})`;
+    if (a.e !== 'ok') rt.push({ e: a.e, t: `${p}: ${a.e === 'vencido' ? a.txt.toUpperCase() : a.txt.toLowerCase() + ' (' + fechaCorta(c.rtVence + 'T12:00') + ')'}` });
+    if (h.e !== 'ok') hs.push({ e: h.e, t: `${p}: ${Math.floor(h.pct)}% del límite${h.pct < 100 && h.fechaLim ? ', lo alcanza aprox. el ' + fechaCorta(h.fechaLim) : ''}` });
+    if (s.si) sr.push({ e: 'sinreporte', t: `${p}: ${s.dias} días sin registrar horómetro` });
+  });
+  return { rt, hs, sr };
+}
+function mensajeResumen() {
+  const { rt, hs, sr } = itemsAviso();
+  const sec = (t, xs) => xs.length ? `\n*${t}*\n` + xs.map(x => `${x.e === 'urgente' || x.e === 'vencido' ? '🔴' : x.e === 'porvencer' ? '🟡' : '⚪'} ${x.t}`).join('\n') + '\n' : '';
+  if (!rt.length && !hs.length && !sr.length) return `*Control de Flota · ${S.config.empresa}*\nAvisos al ${fecha(Date.now())}\n\nTodo al día ✅`;
+  return `*Control de Flota · ${S.config.empresa}*\nAvisos al ${fecha(Date.now())}\n` + sec('Revisión técnica', rt) + sec('Horómetro', hs) + sec('Sin reporte', sr) + `\nVer detalle: ${location.href.split('#')[0]}#resumen`;
+}
+function mensajeCamion(c) {
+  const a = estadoRT(c), h = estadoHoras(c);
+  return `*${fmtPatente(c.patente)}* · ${c.tipo}\n• Revisión técnica: ${a.txt.toLowerCase()} (${fecha(c.rtVence + 'T12:00')})\n• Horómetro: ${n1(h.actual)} de ${n0(c.limite)} h (${Math.floor(h.pct)}%)${h.pct < 100 && h.fechaLim ? `, límite aprox. el ${fecha(h.fechaLim)}` : ''}`;
+}
+const linkWsp = txt => `https://wa.me/${(S.config.wsp || '').replace(/\D/g, '')}?text=${encodeURIComponent(txt)}`;
+function vAvisos() {
+  const msg = mensajeResumen();
+  const { rt, hs, sr } = itemsAviso();
+  return `
+  <h1>Avisos</h1>
+  <p class="sec">Este es el mensaje con todo lo que está por vencer. Revísalo y envíalo.</p>
+  <div class="tarjeta">
+    <div class="fila entre"><h2 style="margin:0">Vista previa</h2><span class="sec">${rt.length + hs.length + sr.length} avisos</span></div>
+    <p class="sec" style="margin:.25rem 0 .75rem">Para: ${S.config.wsp ? esc(S.config.wsp) : 'eliges el contacto en WhatsApp'}</p>
+    <div class="burbuja">${esc(msg)}</div>
+    <div class="acciones" style="margin-top:12px">
+      <a class="btn wsp" style="flex:1" target="_blank" rel="noopener" href="${linkWsp(msg)}">${ic('send')}Enviar por WhatsApp</a>
+      <a class="btn" href="mailto:${esc(S.config.correo)}?subject=${encodeURIComponent('Avisos de flota ' + fecha(Date.now()))}&body=${encodeURIComponent(msg.replace(/\*/g, ''))}">${ic('mail')}Correo</a>
+      <button class="btn" onclick="copiar()">${ic('copy')}Copiar</button>
+    </div>
+  </div>
+  <div class="tarjeta" style="background:var(--acento-suave);border-color:#FDBA74">
+    <h2>En la versión real</h2>
+    <ul style="margin:0;padding-left:1.2rem">
+      <li>El resumen se envía <b>solo</b>, por ejemplo todos los lunes a las 08:00.</li>
+      <li>Se manda un aviso inmediato cuando un camión pasa a <b>urgente</b>: revisión técnica a ${S.config.diasUrgente} días o horómetro sobre el ${S.config.pctUrgente}%.</li>
+      <li>Avisa si un camión lleva más de ${S.config.diasSinReporte} días sin reporte.</li>
+    </ul>
+    <p class="sec" style="margin:.5rem 0 0">Los días y porcentajes se cambian en Ajustes.</p>
+  </div>`;
+}
+function copiar() { navigator.clipboard?.writeText(mensajeResumen()).then(() => toast('Mensaje copiado'), () => toast('No se pudo copiar')); }
+
+/* ============ Ajustes (administrador) ============ */
+function vAjustes() {
+  const cfg = S.config;
+  const campo = (k, t, tipo = 'number', ayuda = '') => `<label class="campo">${t}${ayuda ? ` <span class="ayuda">${ayuda}</span>` : ''}<input name="${k}" type="${tipo}" value="${esc(cfg[k])}" ${tipo === 'number' ? 'min="0" inputmode="numeric"' : ''}></label>`;
+  return `
+  <h1>Ajustes</h1>
+  <form class="tarjeta" onsubmit="guardarAjustes(event)">
+    <h2>Empresa y avisos</h2>
+    ${campo('empresa', 'Nombre de la empresa', 'text')}
+    ${campo('wsp', 'WhatsApp que recibe los avisos', 'tel', '(ej. +56 9 1234 5678; vacío = elegir al enviar)')}
+    ${campo('correo', 'Correo que recibe los avisos', 'email')}
+    <h2 style="margin-top:8px">Cuándo avisar</h2>
+    <div class="grid grid-2">
+      ${campo('diasPorVencer', 'Revisión técnica "por vencer" desde', 'number', '(días antes)')}
+      ${campo('diasUrgente', 'Revisión técnica "urgente" desde', 'number', '(días antes)')}
+      ${campo('pctAviso', 'Horómetro "por vencer" desde', 'number', '(% del límite)')}
+      ${campo('pctUrgente', 'Horómetro "urgente" desde', 'number', '(% del límite)')}
+      ${campo('diasSinReporte', 'Alerta "sin reporte" después de', 'number', '(días)')}
+    </div>
+    <button class="btn pri">Guardar ajustes</button>
+  </form>
+  <div class="tarjeta">
+    <div class="fila entre"><h2 style="margin:0">Flota</h2><a class="btn chico" href="#editar/nuevo">${ic('plus')}Agregar camión</a></div>
+    <div class="tabla-wrap"><table><thead><tr><th>Patente</th><th>Límite</th><th>Rev. técnica</th><th></th></tr></thead><tbody>
+    ${S.camiones.map(c => `<tr><td><b>${fmtPatente(c.patente)}</b><br><span class="sec">${esc(c.tipo)}</span></td><td class="num">${n0(c.limite)} h</td><td>${fecha(c.rtVence + 'T12:00')}</td><td><a class="btn chico" href="#editar/${c.id}">Editar</a></td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+function guardarAjustes(ev) {
+  ev.preventDefault();
+  const fd = new FormData(ev.target);
+  for (const [k, v] of fd) S.config[k] = typeof S.config[k] === 'number' ? Math.max(0, Number(v) || 0) : v.trim();
+  if (S.config.diasUrgente > S.config.diasPorVencer || S.config.pctAviso > S.config.pctUrgente) { toast('Revisa los valores: "urgente" debe estar más cerca que "por vencer"'); return; }
+  guardar(); toast('Ajustes guardados'); render();
+}
+function vEditar(id) {
+  const nuevo = id === 'nuevo'; const c = nuevo ? { patente: '', tipo: '', modelo: '', operador: 'u1', limite: 10000, rtVence: '' } : camion(id);
+  if (!c) return vAjustes();
+  const ops = S.usuarios.filter(u => u.rol === 'operador');
+  return `
+  ${volver(nuevo ? '#ajustes' : '#camion/' + id, nuevo ? 'Ajustes' : 'Volver')}
+  <h1>${nuevo ? 'Agregar camión' : 'Editar ' + fmtPatente(c.patente)}</h1>
+  <form class="tarjeta" onsubmit="guardarCamion(event,'${id}')">
+    <label class="campo">Patente<input name="patente" required value="${esc(c.patente)}" autocapitalize="characters"></label>
+    <label class="campo">Tipo de equipo<input name="tipo" required value="${esc(c.tipo)}" placeholder="Camión tolva, aljibe…"></label>
+    <label class="campo">Marca y modelo<input name="modelo" value="${esc(c.modelo)}"></label>
+    <label class="campo">Operador asignado<select name="operador">${ops.map(o => `<option value="${o.id}" ${o.id === c.operador ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></label>
+    <label class="campo">Límite de horas de motor<input name="limite" type="number" min="1" required value="${c.limite}" inputmode="numeric"></label>
+    <label class="campo">Vencimiento de la revisión técnica<input name="rtVence" type="date" required value="${c.rtVence}"></label>
+    ${nuevo ? '<label class="campo">Lectura actual del horómetro<input name="inicial" type="number" min="0" step="0.1" required inputmode="decimal"></label>' : ''}
+    <div class="acciones"><button class="btn pri" style="flex:1">Guardar</button>${nuevo ? '' : `<button type="button" class="btn" onclick="quitarCamion('${id}')">Quitar de la flota</button>`}</div>
+  </form>`;
+}
+function guardarCamion(ev, id) {
+  ev.preventDefault();
+  const d = Object.fromEntries(new FormData(ev.target));
+  d.patente = d.patente.toUpperCase().replace(/[^A-Z0-9]/g, ''); d.limite = Number(d.limite);
+  if (S.camiones.some(c => c.patente === d.patente && c.id !== id)) { toast('Ya existe un camión con esa patente'); return; }
+  if (id === 'nuevo') {
+    const c = { id: 'c' + Date.now(), patente: d.patente, tipo: d.tipo, modelo: d.modelo, operador: d.operador, limite: d.limite, rtVence: d.rtVence,
+      lecturas: [{ id: 'l' + Date.now(), fecha: Date.now(), valor: Number(d.inicial), usuario: 'u4', foto: false, estado: 'validado', sync: 'enviado' }] };
+    S.camiones.push(c); guardar(); toast('Camión agregado'); ir('camion/' + c.id);
+  } else {
+    Object.assign(camion(id), { patente: d.patente, tipo: d.tipo, modelo: d.modelo, operador: d.operador, limite: d.limite, rtVence: d.rtVence });
+    guardar(); toast('Cambios guardados'); ir('camion/' + id);
+  }
+}
+function quitarCamion(id) {
+  const c = camion(id);
+  if (!confirm(`¿Quitar ${fmtPatente(c.patente)} de la flota? Se borran también sus registros.`)) return;
+  S.camiones = S.camiones.filter(x => x.id !== id); guardar(); toast('Camión quitado'); ir('ajustes');
+}
+
+/* ============ Reporte Excel (CSV) ============ */
+function exportarCSV() {
+  const cab = ['Patente', 'Tipo', 'Modelo', 'Operador', 'Horómetro actual', 'Límite horas', '% usado', 'Promedio h/día', 'Fecha límite aprox.', 'Vence rev. técnica', 'Días restantes RT', 'Último reporte', 'Estado'];
+  const filas = S.camiones.slice().sort(ordenUrgencia).map(c => {
+    const h = estadoHoras(c), rt = estadoRT(c), u = ultima(c);
+    return [fmtPatente(c.patente), c.tipo, c.modelo, usuario(c.operador).nombre, n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fecha(c.rtVence + 'T12:00'), rt.d, u ? fecha(u.fecha) : '', ETQ[estadoGeneral(c)]];
+  });
+  const csv = '﻿' + [cab, ...filas].map(f => f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `flota-${fecha(Date.now()).replace(/\//g, '-')}.csv`; a.click();
+  toast('Reporte descargado');
+}
+
+render();
+</script>
+</body>
+</html>
