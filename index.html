@@ -20,6 +20,7 @@
   --radio:12px;
 }
 *{box-sizing:border-box}
+[hidden]{display:none !important}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--fondo);color:var(--texto);font-family:"Source Sans 3",system-ui,sans-serif;font-size:16px;line-height:1.5}
 h1,h2,h3{font-family:Lexend,system-ui,sans-serif;line-height:1.25;margin:0 0 .5rem}
@@ -33,6 +34,9 @@ button,input,select{font:inherit}
 
 /* Cabecera */
 .top{position:sticky;top:0;z-index:10;background:var(--primario);color:#fff;padding:.6rem 16px;display:flex;align-items:center;gap:.6rem}
+.top .volver{display:inline-flex;align-items:center;gap:.3rem;min-height:44px;padding:0 .7rem 0 .4rem;margin-left:-.4rem;border:0;border-radius:8px;background:rgba(255,255,255,.12);color:#fff;font-weight:600;cursor:pointer}
+.top .volver .ico{width:1.4em;height:1.4em}
+@media (max-width:480px){.top .volver:not([hidden]) ~ .marca .marca-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
 .top .marca{display:flex;align-items:center;gap:.5rem;font-family:Lexend;font-weight:700;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
 .pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.2rem .65rem;font-size:.85rem;font-weight:600;white-space:nowrap}
 .top .logo{color:var(--acento);width:1.6em;height:1.6em}
@@ -145,7 +149,8 @@ th{color:var(--texto-2);font-weight:600}
 </head>
 <body>
 <header class="top">
-  <a class="marca" href="#inicio"><svg class="ico logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg>Control de Flota</a>
+  <button id="btnVolver" class="volver" type="button" onclick="volverAtras()" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg>Volver</button>
+  <a class="marca" href="#inicio"><svg class="ico logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg><span class="marca-txt">Control de Flota</span></a>
   <span id="estadoRed" class="pill"></span>
 </header>
 <div class="demo-banda">Demostración · todos los datos son de ejemplo</div>
@@ -364,13 +369,26 @@ function render() {
   const app = $('#app');
   app.className = (r === 'operador' || r === 'registrar') ? 'vista-op' : '';
   app.innerHTML = (vistas[r] || vInicio)(arg, new URLSearchParams(q || ''));
+  $('#btnVolver').hidden = !vistas[r] || r === 'inicio';
   pintarNav(r); pintarRed();
   const h = app.querySelector('h1'); if (h && render.mover) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
   render.mover = false;
 }
-addEventListener('hashchange', () => { render.mover = true; scrollTo(0, 0); render(); });
+// Botón Volver: vuelve a la pantalla anterior; si se entró por un link directo, sube un nivel
+const PADRE = { operador: 'inicio', registrar: 'operador', resumen: 'inicio', camiones: 'resumen', camion: 'camiones', registros: 'resumen', avisos: 'resumen', ajustes: 'resumen', editar: 'ajustes' };
+const rutaActual = () => (location.hash.slice(1) || 'inicio').split(/[/?]/)[0];
+let pila = [location.hash || '#inicio'];
+addEventListener('hashchange', () => {
+  const h = location.hash || '#inicio';
+  if (pila[pila.length - 1] !== h) { if (pila[pila.length - 2] === h) pila.pop(); else pila.push(h); }
+  if (rutaActual() !== 'registrar') REG = null;
+  render.mover = true; scrollTo(0, 0); render();
+});
+function volverAtras() {
+  if (pila.length > 1) { pila.pop(); location.hash = pila[pila.length - 1]; }
+  else { const p = '#' + (PADRE[rutaActual()] || 'inicio'); pila = [p]; location.hash = p; }
+}
 function ir(h) { location.hash = h; }
-const volver = (href, txt) => `<a class="btn txt no-print" href="${href}">${ic('back')}${txt}</a>`;
 
 /* ============ Vista: Inicio (elegir perfil) ============ */
 function vInicio() {
@@ -431,8 +449,7 @@ function vRegistrar(id) {
   const c = camion(id); if (!c) return vOperador();
   if (!REG || REG.id !== id) REG = { id, paso: 1, valor: '', foto: null, error: '' };
   const u = ultima(c, true);
-  const cab = `${volver('#operador', 'Volver')}
-    <div class="paso">Paso ${REG.paso} de 3</div>
+  const cab = `<div class="paso">Paso ${REG.paso} de 3</div>
     <h1>${fmtPatente(c.patente)} <span class="sec" style="font-size:1rem">${esc(c.tipo)}</span></h1>`;
   if (REG.done) return `<div class="listo">
       <div class="circulo">${ic('check')}</div>
@@ -563,7 +580,6 @@ function vCamion(id) {
   const max = Math.max(12, ...dias.map(x => x.h));
   const puedeValidar = S.rol !== 'operador';
   return `
-  ${volver('#camiones', 'Camiones')}
   <div class="fila entre" style="flex-wrap:wrap"><h1 style="margin:0" class="patente">${fmtPatente(c.patente)}</h1>${chip(estadoGeneral(c), ETQ[estadoGeneral(c)])}</div>
   <p class="sec">${esc(c.tipo)} · ${esc(c.modelo)} · Operador: ${esc(usuario(c.operador).nombre)}</p>
   <div class="grid grid-2">
@@ -725,7 +741,6 @@ function vEditar(id) {
   if (!c) return vAjustes();
   const ops = S.usuarios.filter(u => u.rol === 'operador');
   return `
-  ${volver(nuevo ? '#ajustes' : '#camion/' + id, nuevo ? 'Ajustes' : 'Volver')}
   <h1>${nuevo ? 'Agregar camión' : 'Editar ' + fmtPatente(c.patente)}</h1>
   <form class="tarjeta" onsubmit="guardarCamion(event,'${id}')">
     <label class="campo">Patente<input name="patente" required value="${esc(c.patente)}" autocapitalize="characters"></label>
