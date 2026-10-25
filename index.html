@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0B3B66">
+<meta name="theme-color" content="#111111">
 <title>Control de Flota · Demostración</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --primario:#0B3B66; --acento:#C2410C; --acento-suave:#FFEDD5;
+  --primario:#111111; --acento:#FFC20E; --sobre-acento:#111111; --acento-suave:#FFF4CC; --foco:#2563EB;
   --fondo:#F1F5F9; --tarjeta:#FFFFFF; --texto:#0F172A; --texto-2:#475569; --borde:#CBD5E1;
   --wsp:#128C7E;
   --ok-f:#DCFCE7; --ok-t:#166534;
-  --pv-f:#FEF3C7; --pv-t:#92400E;
+  --pv-f:#FFEDD5; --pv-t:#9A3412;
   --ur-f:#FEE2E2; --ur-t:#991B1B;
   --sr-f:#E2E8F0; --sr-t:#334155;
   --radio:12px;
@@ -27,17 +27,19 @@ h1{font-size:1.5rem} h2{font-size:1.2rem} h3{font-size:1.05rem}
 p{margin:0 0 .75rem}
 a{color:var(--primario)}
 button,input,select{font:inherit}
-:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+:focus-visible{outline:3px solid var(--foco);outline-offset:2px}
 .num{font-family:Lexend,sans-serif;font-variant-numeric:tabular-nums}
 .ico{width:1.25em;height:1.25em;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* Cabecera */
 .top{position:sticky;top:0;z-index:10;background:var(--primario);color:#fff;padding:.6rem 16px;display:flex;align-items:center;gap:.6rem}
-.top .marca{display:flex;align-items:center;gap:.5rem;font-family:Lexend;font-weight:600;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
+.top .marca{display:flex;align-items:center;gap:.5rem;font-family:Lexend;font-weight:700;font-size:1.05rem;color:#fff;text-decoration:none;margin-right:auto}
 .pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.2rem .65rem;font-size:.85rem;font-weight:600;white-space:nowrap}
+.top .logo{color:var(--acento);width:1.6em;height:1.6em}
+.top{border-bottom:4px solid var(--acento)}
 .top .pill{background:rgba(255,255,255,.15);color:#fff}
 .top .pill.off{background:#FDE68A;color:#78350F}
-.demo-banda{background:var(--acento-suave);color:#7C2D12;text-align:center;font-size:.85rem;padding:.3rem 16px;font-weight:600}
+.demo-banda{background:var(--acento);color:var(--sobre-acento);text-align:center;font-size:.85rem;padding:.3rem 16px;font-weight:600}
 
 main{max-width:1040px;margin:0 auto;padding:16px 16px 96px}
 .tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:var(--radio);padding:16px;margin-bottom:12px}
@@ -50,7 +52,7 @@ main{max-width:1040px;margin:0 auto;padding:16px 16px 96px}
 /* Botones */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:.6rem 1.1rem;border-radius:10px;border:2px solid var(--primario);background:#fff;color:var(--primario);font-weight:600;cursor:pointer;text-decoration:none;text-align:center}
 .btn.pri{background:var(--primario);color:#fff}
-.btn.cta{background:var(--acento);border-color:var(--acento);color:#fff}
+.btn.cta{background:var(--acento);border-color:var(--primario);color:var(--sobre-acento)}
 .btn.wsp{background:var(--wsp);border-color:var(--wsp);color:#fff}
 .btn.grande{min-height:60px;font-size:1.15rem;width:100%}
 .btn.chico{min-height:40px;padding:.35rem .8rem;font-size:.95rem}
@@ -65,7 +67,7 @@ main{max-width:1040px;margin:0 auto;padding:16px 16px 96px}
 .chip.urgente,.chip.vencido{background:var(--ur-f);color:var(--ur-t)}
 .chip.sinreporte{background:var(--sr-f);color:var(--sr-t)}
 .borde-urgente,.borde-vencido{border-left:6px solid var(--ur-t)}
-.borde-porvencer{border-left:6px solid #B45309}
+.borde-porvencer{border-left:6px solid #C2410C}
 .borde-sinreporte{border-left:6px solid var(--sr-t)}
 .borde-ok{border-left:6px solid var(--ok-t)}
 
@@ -87,7 +89,7 @@ main{max-width:1040px;margin:0 auto;padding:16px 16px 96px}
 /* Barra de horas */
 .barra{height:14px;border-radius:7px;background:#E2E8F0;overflow:hidden;margin:.4rem 0}
 .barra > span{display:block;height:100%;background:var(--ok-t)}
-.barra.porvencer > span{background:#B45309} .barra.urgente > span,.barra.vencido > span{background:var(--ur-t)}
+.barra.porvencer > span{background:#C2410C} .barra.urgente > span,.barra.vencido > span{background:var(--ur-t)}
 
 /* Formularios */
 label.campo{display:block;font-weight:600;margin-bottom:12px}
@@ -98,7 +100,7 @@ label.campo input,label.campo select{display:block;width:100%;margin-top:.3rem;m
 
 /* Operador: letra más grande */
 .vista-op{font-size:18px}
-.paso{font-weight:700;color:var(--acento);font-family:Lexend}
+.paso{display:inline-block;font-weight:700;background:var(--acento);color:var(--sobre-acento);border-radius:6px;padding:.1rem .6rem;font-family:Lexend;margin-bottom:.4rem}
 .foto-prev{width:100%;max-height:260px;object-fit:contain;border-radius:10px;border:1px solid var(--borde);background:#0F172A}
 .listo{text-align:center;padding:24px 8px}
 .listo .circulo{width:96px;height:96px;border-radius:50%;background:var(--ok-f);color:var(--ok-t);display:grid;place-items:center;margin:0 auto 16px}
@@ -120,7 +122,7 @@ th{color:var(--texto-2);font-weight:600}
 .perfil .ic .ico{width:28px;height:28px}
 .pasos{counter-reset:p;list-style:none;padding:0;margin:0}
 .pasos li{counter-increment:p;display:flex;gap:12px;margin-bottom:12px}
-.pasos li::before{content:counter(p);flex:none;width:32px;height:32px;border-radius:50%;background:var(--acento);color:#fff;display:grid;place-items:center;font-family:Lexend;font-weight:700}
+.pasos li::before{content:counter(p);flex:none;width:32px;height:32px;border-radius:50%;background:var(--acento);color:var(--sobre-acento);display:grid;place-items:center;font-family:Lexend;font-weight:700}
 
 /* Navegación inferior */
 .nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--borde);display:flex;justify-content:center;z-index:10;padding-bottom:env(safe-area-inset-bottom)}
@@ -143,7 +145,7 @@ th{color:var(--texto-2);font-weight:600}
 </head>
 <body>
 <header class="top">
-  <a class="marca" href="#inicio"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg>Control de Flota</a>
+  <a class="marca" href="#inicio"><svg class="ico logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg>Control de Flota</a>
   <span id="estadoRed" class="pill"></span>
 </header>
 <div class="demo-banda">Demostración · todos los datos son de ejemplo</div>
@@ -404,7 +406,7 @@ function vOperador() {
   return `
   <h1>Hola, ${esc(usuario(OP_ID).nombre.split(' ')[0])}</h1>
   <p class="sec">Toca <b>Registrar horómetro</b> en el camión que estás usando.</p>
-  ${!enLinea() ? `<div class="tarjeta" style="background:#FEF3C7;border-color:#F59E0B"><div class="fila">${ic('wifi-off')}<b>Estás sin señal.</b></div><p style="margin:.4rem 0 0">Puedes registrar igual: se guarda en el celular y se envía solo cuando vuelva la señal.${cola ? ` <b>${cola} por enviar.</b>` : ''}</p></div>` : ''}
+  ${!enLinea() ? `<div class="tarjeta" style="background:var(--pv-f);border-color:#C2410C"><div class="fila">${ic('wifi-off')}<b>Estás sin señal.</b></div><p style="margin:.4rem 0 0">Puedes registrar igual: se guarda en el celular y se envía solo cuando vuelva la señal.${cola ? ` <b>${cola} por enviar.</b>` : ''}</p></div>` : ''}
   ${mios.map(c => {
     const u = ultima(c, true); const sr = sinReporte(c); const hoyYa = u && diasHasta(u.fecha) === 0;
     return `<div class="tarjeta ${hoyYa ? 'borde-ok' : sr.si ? 'borde-porvencer' : ''}">
@@ -671,7 +673,7 @@ function vAvisos() {
       <button class="btn" onclick="copiar()">${ic('copy')}Copiar</button>
     </div>
   </div>
-  <div class="tarjeta" style="background:var(--acento-suave);border-color:#FDBA74">
+  <div class="tarjeta" style="background:var(--acento-suave);border-color:var(--acento)">
     <h2>En la versión real</h2>
     <ul style="margin:0;padding-left:1.2rem">
       <li>El resumen se envía <b>solo</b>, por ejemplo todos los lunes a las 08:00.</li>
