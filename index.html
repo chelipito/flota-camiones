@@ -209,6 +209,26 @@ th{color:var(--texto-2);font-weight:600}
 .graf span{flex:1;background:var(--primario);border-radius:3px 3px 0 0;min-height:2px}
 .graf-ejes{display:flex;justify-content:space-between;color:var(--texto-2);font-size:.8rem}
 .nota{background:var(--acento-suave);border-color:var(--acento)}
+
+/* Simulación de WhatsApp */
+.chat{display:flex;flex-direction:column;height:min(680px,calc(100dvh - 200px));min-height:420px;max-width:520px;margin:0 auto;border:1px solid var(--borde);border-radius:var(--radio);overflow:hidden;background:#ECE5DD}
+.chat-cab{background:#075E54;color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center}
+.chat-cab .avatar{background:var(--acento);color:#111}
+.chat-cab small{display:block;opacity:.85}
+.chat-msgs{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:6px}
+.msg{max-width:85%;padding:6px 10px 4px;border-radius:8px;white-space:pre-wrap;box-shadow:0 1px 1px rgba(0,0,0,.12);overflow-wrap:anywhere;font-size:16px;line-height:1.4}
+.msg.yo{align-self:flex-end;background:#DCF8C6}
+.msg.bot{align-self:flex-start;background:#fff}
+.msg .t{display:block;text-align:right;font-size:.72rem;color:#54656F;margin-top:2px}
+.msg img{display:block;max-width:200px;width:100%;border-radius:6px;margin-bottom:4px}
+.msg-dia{align-self:center;background:#E1F2FB;color:#334155;font-size:.8rem;border-radius:6px;padding:.15rem .6rem}
+.chat-sug{display:flex;gap:6px;overflow-x:auto;padding:8px 8px 0;background:#F0F2F5}
+.chat-sug button{flex:none;border:1px solid var(--borde);background:#fff;color:var(--texto);border-radius:999px;padding:.3rem .8rem;min-height:38px;cursor:pointer;font-weight:600}
+.chat-input{display:flex;gap:6px;padding:8px;background:#F0F2F5;align-items:center}
+.chat-input input[type=text]{flex:1;min-width:0;min-height:46px;border-radius:999px;border:1px solid var(--borde);padding:0 14px;font-size:16px;background:#fff}
+.redondo{width:46px;height:46px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;flex:none;background:transparent;color:#54656F}
+.redondo.enviar{background:#128C7E;color:#fff}
+.redondo .ico{width:22px;height:22px}
 @media (prefers-reduced-motion:no-preference){.btn,.kpi{transition:filter .15s}.btn:hover,.kpi:hover{filter:brightness(.95)}}
 @media print{.side,.scrim,.top,.demo-banda,.no-print{display:none !important}body.con-side .contenido{margin-left:0}main{padding:0}.tarjeta{break-inside:avoid}.papel{border:0;box-shadow:none;padding:0}}
 </style>
@@ -471,10 +491,10 @@ const MENU = [
   ['revisiones', 'shield', 'Revisiones técnicas'], ['horometros', 'gauge', 'Horómetros'],
   ['avisos', 'bell', 'Avisos'], ['usuarios', 'users', 'Usuarios y accesos']
 ];
-const SECCION = { camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
+const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
 const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
-const PERMISOS = { empleado: ['empleado', 'registrar'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles
+const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
 function permitido(rol, r) { return rol === 'dueno' ? !['empleado', 'registrar', 'cliente'].includes(r) : PERMISOS[rol].includes(r); }
 function leerRuta() {
   const [path, qs = ''] = location.hash.slice(1).split('?');
@@ -485,6 +505,7 @@ function padre(r, arg) {
   switch (r) {
     case 'inicio': case 'empleado': case 'cliente': return 'perfil';
     case 'registrar': return 'empleado';
+    case 'wsp': return S.rol === 'dueno' ? 'horometros' : 'empleado';
     case 'camion': return 'flota';
     case 'contrato': return 'contratos';
     case 'ficha': return 'contrato/' + arg;
@@ -534,6 +555,8 @@ function render() {
   $('#marca').href = S.rol && r !== 'perfil' ? '#' + HOME[S.rol] : '#perfil';
   if (conSide) pintarMenu(r);
   pintarRed();
+  const cm = $('#chatMsgs');
+  if (cm) { cm.scrollTop = cm.scrollHeight; if (CHAT_TECLADO) $('#chatTxt').focus({ preventScroll: true }); }
   const h = app.querySelector('h1'); if (h && render.mover) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
   render.mover = false;
 }
@@ -599,6 +622,11 @@ VISTAS.perfil = () => {
       <li><span><b>El cliente</b> puede revisar el estado de lo que tiene arrendado.</span></li>
     </ol>
   </div>
+  <section class="tarjeta" style="border-color:#128C7E">
+    <h2>Registro por WhatsApp (simulación)</h2>
+    <p class="sec">El empleado manda la patente y el número por WhatsApp, y queda registrado en la app.</p>
+    <button class="btn wsp" onclick="S.rol='empleado';guardar();ir('wsp')">${ic('send')}Probar el chat</button>
+  </section>
   <button class="btn" onclick="reiniciar()">Reiniciar datos de ejemplo</button>`;
 };
 function elegirRol(rol) { S.rol = rol; guardar(); ir(HOME[rol]); }
@@ -706,7 +734,7 @@ VISTAS.camion = id => {
     <div class="tabla-wrap"><table>
       <thead><tr><th>Fecha</th><th>Lectura</th><th>Foto</th><th>Estado</th></tr></thead>
       <tbody>${ls.slice(-10).reverse().map(l => `<tr>
-        <td>${fechaCorta(l.fecha)} ${hora(l.fecha)}<br><span class="sec">${esc(usuario(l.usuario).nombre)}</span></td>
+        <td>${fechaCorta(l.fecha)} ${hora(l.fecha)}<br><span class="sec">${esc(usuario(l.usuario).nombre)}${l.origen === 'whatsapp' ? ' · WhatsApp' : ''}</span></td>
         <td class="num">${n1(l.valor)}</td>
         <td><img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)}"></td>
         <td>${celdaEstado(l, c.id)}</td></tr>`).join('')}</tbody>
@@ -925,7 +953,7 @@ VISTAS.horometros = () => {
   pend.sort((a, b) => b.l.fecha - a.l.fecha);
   return `
   <div class="cab"><div><h1>Horómetros</h1><p class="sec" style="margin:0">Horas de motor de cada camión respecto de su límite.</p></div>
-    <button class="btn chico no-print" onclick="exportarCSV()">${ic('download')}Excel</button></div>
+    <div class="acciones no-print"><a class="btn chico wsp" href="#wsp">${ic('send')}Probar registro por WhatsApp</a><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
   <div class="kpis k3">
     ${kpi(cerca ? 'porvencer' : 'ok', cerca, 'Cerca del límite', 'gauge')}
     ${kpi(sr ? 'sinreporte' : 'ok', sr, 'Sin reporte', 'wifi-off')}
@@ -938,7 +966,7 @@ VISTAS.horometros = () => {
       <img src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro" style="width:120px;border-radius:8px;flex:none">
       <div><div class="num" style="font-size:1.4rem;font-weight:700">${n1(l.valor)} h</div>
       <div class="sec">${ant ? `+${n1(l.valor - ant.valor)} h desde ${cuando(ant.fecha)}` : 'Primer registro'}</div>
-      <div class="sec">${esc(usuario(l.usuario).nombre)}</div></div>
+      <div class="sec">${esc(usuario(l.usuario).nombre)}${l.origen === 'whatsapp' ? ' · vía WhatsApp' : ''}</div></div>
     </div>
     <div class="acciones"><button class="btn pri" style="flex:1" onclick="validar('${c.id}','${l.id}',true)">${ic('check')}Validar</button><button class="btn" onclick="validar('${c.id}','${l.id}',false)">Observar</button></div>
   </section>`).join('')}</div>` : ''}
@@ -1170,6 +1198,11 @@ VISTAS.empleado = () => {
       <a class="btn cta grande" href="#registrar/${c.id}">${ic('gauge')}Registrar horómetro</a>
     </div>`;
   }).join('') : '<div class="tarjeta vacio">No tienes camiones asignados. Avísale al dueño.</div>'}
+  <div class="tarjeta" style="border-color:#128C7E">
+    <h3>¿Prefieres WhatsApp?</h3>
+    <p class="sec">También puedes mandar la patente y el número por WhatsApp, y queda registrado igual.</p>
+    <a class="btn wsp" href="#wsp">${ic('send')}Registrar por WhatsApp (simulación)</a>
+  </div>
   <div class="tarjeta no-print">
     <h3>Probar sin señal (solo demostración)</h3>
     <p class="sec">Simula que estás en una zona sin cobertura para ver cómo se guardan los registros.</p>
@@ -1223,30 +1256,43 @@ VISTAS.registrar = id => {
       <button class="btn cta" style="flex:1" onclick="guardarRegistro()">${ic('check')}Guardar</button></div>
     </div>`;
 };
-function paso1(id) {
-  const c = camion(id); const u = ultima(c, true);
-  const raw = $('#lect').value.trim().replace(/\./g, '').replace(',', '.');
-  const v = Number(raw);
-  REG.valor = $('#lect').value; REG.error = '';
-  if (!raw || isNaN(v) || v <= 0) REG.error = 'Escribe el número del horómetro, solo con números.';
-  else if (u && v < u.valor) REG.error = `El número es menor que la última vez (${n1(u.valor)} h). El horómetro nunca baja: revisa que esté bien escrito.`;
-  else if (u) {
+/* Reglas del horómetro (las usan la app y el chat de WhatsApp): devuelve el error o '' si está bien */
+function validarLectura(c, v) {
+  const u = ultima(c, true);
+  if (isNaN(v) || v <= 0) return 'Escribe el número del horómetro, solo con números.';
+  if (u && v < u.valor) return `El número es menor que la última vez (${n1(u.valor)} h). El horómetro nunca baja: revisa que esté bien escrito.`;
+  if (u) {
     const pasaron = (Date.now() - u.fecha) / 3600000;
-    if (v - u.valor > pasaron + 0.5) REG.error = `Son ${n1(v - u.valor)} horas más que la última vez, pero desde entonces solo han pasado ${n1(pasaron)} horas. Revisa el número.`;
+    if (v - u.valor > pasaron + 0.5) return `Son ${n1(v - u.valor)} horas más que la última vez, pero desde entonces solo han pasado ${n1(pasaron)} horas. Revisa el número.`;
   }
-  if (!REG.error) { REG.valor = v; REG.paso = 2; }
+  return '';
+}
+// "7.450" o "7 450" = 7450; "7450,5" o "7450.5" = 7450,5
+function leerNumero(txt) {
+  let s = String(txt).trim().replace(/\s/g, '');
+  if (/^\d+\.\d$/.test(s)) return Number(s);
+  return Number(s.replace(/\./g, '').replace(',', '.'));
+}
+function paso1(id) {
+  const c = camion(id);
+  REG.valor = $('#lect').value;
+  REG.error = $('#lect').value.trim() ? validarLectura(c, leerNumero(REG.valor)) : 'Escribe el número del horómetro, solo con números.';
+  if (!REG.error) { REG.valor = leerNumero(REG.valor); REG.paso = 2; }
   render();
 }
-function cargarFoto(inp) {
-  const f = inp.files[0]; if (!f) return;
+function achicarFoto(f, listo) { // se achica para no llenar la memoria del celular
   const img = new Image(); const url = URL.createObjectURL(f);
-  img.onload = () => { // se achica para no llenar la memoria del celular
+  img.onload = () => {
     const k = Math.min(1, 640 / Math.max(img.width, img.height));
     const cv = document.createElement('canvas'); cv.width = img.width * k; cv.height = img.height * k;
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-    REG.foto = cv.toDataURL('image/jpeg', 0.7); REG.error = ''; URL.revokeObjectURL(url); render();
+    URL.revokeObjectURL(url); listo(cv.toDataURL('image/jpeg', 0.7));
   };
   img.src = url;
+}
+function cargarFoto(inp) {
+  const f = inp.files[0]; if (!f) return;
+  achicarFoto(f, foto => { REG.foto = foto; REG.error = ''; render(); });
 }
 function paso2() { if (!REG.foto) { REG.error = 'Falta la foto. Toca "Tomar foto".'; render(); return; } REG.error = ''; REG.paso = 3; render(); }
 function guardarRegistro() {
@@ -1254,6 +1300,106 @@ function guardarRegistro() {
   const offline = !enLinea();
   c.lecturas.push({ id: 'l' + Date.now(), fecha: Date.now(), valor: REG.valor, usuario: EMP_ID, foto: true, img: REG.foto.length < 120000 ? REG.foto : null, estado: 'pendiente', sync: offline ? 'cola' : 'enviado' });
   guardar(); REG.done = true; REG.offline = offline; render();
+}
+
+/* ============ Simulación: registro por WhatsApp ============ */
+// En la versión real esto lo hace un programa en Supabase que recibe los mensajes desde la API de WhatsApp Business.
+let CHAT_TECLADO = false; // solo se vuelve a enfocar el campo si la persona escribió (en celular no abre el teclado por sorpresa)
+const misCamiones = () => S.camiones.filter(c => c.operador === EMP_ID);
+const sugerido = c => { const u = ultima(c, true); const pasaron = u ? (Date.now() - u.fecha) / 3600000 : 8; return Math.floor((u ? u.valor : 0) + Math.min(8, Math.max(1, pasaron - 1))); };
+function chatAyuda() {
+  const cs = misCamiones(), c = cs[0];
+  return `Hola ${primerNombre(usuario(EMP_ID).nombre)} 👋\nPara registrar el horómetro escribe la *patente* y el *número*.\nEjemplo: ${c ? c.patente + ' ' + sugerido(c) : 'KDLP21 7450'}\n\nTus camiones:\n${cs.map(x => '• ' + fmtPatente(x.patente)).join('\n') || '(ninguno asignado)'}\n\nSi quieres, manda también una foto del horómetro.`;
+}
+function chatEstado() {
+  if (!S.chat) S.chat = { msgs: [], ctx: {} };
+  if (!S.chat.msgs.length) S.chat.msgs.push({ de: 'bot', txt: chatAyuda(), t: Date.now() });
+  return S.chat;
+}
+VISTAS.wsp = () => {
+  const ch = chatEstado(), cs = misCamiones(), c = cs[0];
+  const sug = c ? [`${c.patente} ${sugerido(c)}`, '📷 Foto de ejemplo', 'Hola', `${c.patente} ${Math.max(1, Math.floor(ultima(c, true).valor) - 100)}`] : ['Hola'];
+  return `
+  <div class="cab"><div><h1>Registro por WhatsApp</h1><p class="sec" style="margin:0">Simulación: así le escribiría <b>${esc(usuario(EMP_ID).nombre)}</b> al número de WhatsApp de la empresa.</p></div>
+    ${S.rol === 'dueno' ? `<a class="btn chico no-print" href="#horometros">Ver en Horómetros →</a>` : ''}</div>
+  <div class="chat">
+    <div class="chat-cab"><span class="avatar">${ic('truck')}</span><div><b>${esc(S.config.empresa)} · Horómetros</b><small>Cuenta de empresa · responde al instante</small></div></div>
+    <div class="chat-msgs" id="chatMsgs" aria-live="polite">
+      <span class="msg-dia">Hoy</span>
+      ${ch.msgs.map(m => `<div class="msg ${m.de}">${m.img ? `<img src="${m.img}" alt="Foto del horómetro">` : ''}${m.txt ? esc(m.txt).replace(/\*([^*\n]+)\*/g, '<b>$1</b>') : ''}<span class="t">${hora(m.t)}${m.de === 'yo' ? ' ✓✓' : ''}</span></div>`).join('')}
+    </div>
+    <div class="chat-sug" aria-label="Mensajes de ejemplo">${sug.map(s => `<button type="button" onclick="chatSugerencia(this.textContent)">${esc(s)}</button>`).join('')}</div>
+    <form class="chat-input" onsubmit="chatEnviar(event)">
+      <label class="redondo" title="Enviar foto">${ic('camera')}<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Enviar foto</span><input type="file" accept="image/*" capture="environment" hidden onchange="chatFoto(this)"></label>
+      <input type="text" id="chatTxt" placeholder="Escribe un mensaje" autocomplete="off" aria-label="Mensaje">
+      <button class="redondo enviar" aria-label="Enviar">${ic('send')}</button>
+    </form>
+  </div>
+  <div class="acciones no-print" style="justify-content:center;margin-top:12px"><button class="btn chico" onclick="S.chat=null;guardar();render()">Borrar conversación</button></div>
+  <section class="tarjeta nota" style="max-width:520px;margin:12px auto 0">
+    <h2>Qué entiende el bot</h2>
+    <ul style="margin:0;padding-left:1.2rem">
+      <li><b>Patente + número</b>: "KDLP21 7450", "KD-LP-21 7.450" o "kdlp21 7450,5".</li>
+      <li><b>Solo la patente</b>: pregunta cuánto marca.</li>
+      <li><b>Una foto</b>: la guarda como respaldo del registro.</li>
+      <li>Aplica las mismas reglas que la app: el número no puede bajar ni subir más horas de las que pasaron.</li>
+    </ul>
+  </section>`;
+};
+function chatSugerencia(txt) {
+  CHAT_TECLADO = false;
+  if (txt.startsWith('📷')) { const c = misCamiones()[0]; chatRecibir('', fotoEjemplo(c ? sugerido(c) : 0)); return; }
+  chatRecibir(txt);
+}
+function chatEnviar(ev) { ev.preventDefault(); const t = $('#chatTxt').value.trim(); if (t) { CHAT_TECLADO = true; chatRecibir(t); } }
+function chatFoto(inp) { CHAT_TECLADO = false; const f = inp.files[0]; if (f) achicarFoto(f, foto => chatRecibir('', foto)); }
+function chatRecibir(txt, img) {
+  const ch = chatEstado();
+  ch.msgs.push({ de: 'yo', txt, img: img && img.length < 120000 ? img : (img ? fotoEjemplo(0) : null), t: Date.now() });
+  guardar(); render();
+  setTimeout(() => { ch.msgs.push({ de: 'bot', txt: chatResponder(txt, img), t: Date.now() }); guardar(); if (leerRuta().r === 'wsp') render(); }, 600);
+}
+function chatResponder(txt, img) {
+  const ch = S.chat, ctx = ch.ctx, cs = misCamiones();
+  const lista = cs.map(x => fmtPatente(x.patente)).join(', ');
+  if (img && !txt) {
+    // foto sola: respalda el último registro hecho por chat (si fue hace menos de 30 min) o queda esperando los datos
+    const cu = ctx.ultimo && camion(ctx.ultimo.cid);
+    const r = cu && cu.lecturas.find(l => l.id === ctx.ultimo.lid);
+    if (r && Date.now() - r.fecha < 30 * 60000) {
+      r.img = img.length < 120000 ? img : null; r.foto = true; ch.ctx = {}; guardar();
+      return `📷 Foto guardada como respaldo del registro de ${fmtPatente(cu.patente)} (${n1(r.valor)} h). ¡Gracias!`;
+    }
+    ctx.foto = img.length < 120000 ? img : null;
+    return 'Recibí la foto 👍\n¿De qué camión y cuánto marca? Escribe la patente y el número, por ejemplo:\n' + (cs[0] ? `${cs[0].patente} ${sugerido(cs[0])}` : 'KDLP21 7450');
+  }
+  const T = txt.toUpperCase();
+  if (/^(HOLA|AYUDA|MENU|MENÚ|INICIO|BUENAS|BUENOS)/.test(T.trim())) return chatAyuda();
+  // patente: 2 letras + 2 letras/números + 2 números, con o sin separadores
+  const mp = T.match(/\b([A-Z]{2})[\s·.\-]?([A-Z0-9]{2})[\s·.\-]?(\d{2})\b/);
+  const resto = mp ? T.replace(mp[0], ' ') : T;
+  const mn = resto.match(/\d[\d.\s]*(?:,\d+)?/);
+  let c = null;
+  if (mp) {
+    const pat = mp[1] + mp[2] + mp[3];
+    c = cs.find(x => x.patente === pat);
+    if (!c) return `No encuentro el camión ${fmtPatente(pat)} entre tus camiones asignados.\nTus camiones son: ${lista || 'ninguno'}.\nSi es un error, avísale a la oficina.`;
+  } else if (ctx.cid && mn) c = camion(ctx.cid); // respondió solo el número a la pregunta anterior
+  if (!c) {
+    if (mn && cs.length === 1) c = cs[0];
+    else return `No entendí de qué camión es 🤔\nEscribe la patente y el número, por ejemplo:\n${cs[0] ? `${cs[0].patente} ${sugerido(cs[0])}` : 'KDLP21 7450'}`;
+  }
+  if (!mn) { ctx.cid = c.id; guardar(); return `¿Cuánto marca el horómetro de ${fmtPatente(c.patente)}? Escribe solo el número.`; }
+  const v = leerNumero(mn[0]);
+  const err = validarLectura(c, v);
+  if (err) { ctx.cid = c.id; guardar(); return `⚠️ ${err}\nEscribe el número de nuevo.`; }
+  const u = ultima(c, true);
+  const foto = img || ctx.foto || null;
+  const l = { id: 'l' + Date.now(), fecha: Date.now(), valor: v, usuario: EMP_ID, foto: !!foto, img: foto && foto.length < 120000 ? foto : null, estado: 'pendiente', sync: 'enviado', origen: 'whatsapp' };
+  c.lecturas.push(l);
+  ch.ctx = foto ? {} : { ultimo: { cid: c.id, lid: l.id } };
+  guardar();
+  return `✅ *Registrado*\n${fmtPatente(c.patente)} · ${n1(v)} h\n${u ? `+${n1(v - u.valor)} h desde ${cuando(u.fecha)}.` : 'Primer registro.'}\n${foto ? '📷 Foto guardada como respaldo.' : 'Si puedes, manda una foto del horómetro como respaldo.'}\n¡Gracias, ${primerNombre(usuario(EMP_ID).nombre)}!`;
 }
 
 /* ============ Cliente (empresa que arrienda) ============ */
