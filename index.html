@@ -99,7 +99,8 @@ main{max-width:1120px;margin:0 auto;padding:20px 16px 48px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:48px;padding:.6rem 1.1rem;border-radius:10px;border:2px solid var(--primario);background:#fff;color:var(--primario);font-weight:600;cursor:pointer;text-decoration:none;text-align:center}
 .btn.pri{background:var(--primario);color:#fff}
 .btn.cta{background:var(--acento);border-color:var(--primario);color:var(--sobre-acento)}
-.btn.wsp{background:var(--wsp);border-color:var(--wsp);color:#fff}
+.btn.wsp{background:#fff;border-color:var(--borde);color:var(--texto)}
+.btn.wsp .ico{color:var(--wsp)}
 .btn.peligro{border-color:var(--ur-t);color:var(--ur-t)}
 .btn.grande{min-height:60px;font-size:1.15rem;width:100%}
 .btn.chico{min-height:40px;padding:.35rem .8rem;font-size:.95rem}
@@ -109,17 +110,14 @@ main{max-width:1120px;margin:0 auto;padding:20px 16px 48px}
 
 /* Semáforo y chips */
 .chip{display:inline-flex;align-items:center;gap:.35rem;border-radius:8px;padding:.2rem .6rem;font-weight:600;font-size:.9rem;white-space:nowrap}
-.chip.ok{background:var(--ok-f);color:var(--ok-t)}
-.chip.porvencer{background:var(--pv-f);color:var(--pv-t)}
-.chip.urgente,.chip.vencido{background:var(--ur-f);color:var(--ur-t)}
-.chip.sinreporte{background:var(--sr-f);color:var(--sr-t)}
-.chip.arrendado{background:#111;color:var(--acento)}
-.chip.disponible{background:#fff;color:#111;box-shadow:inset 0 0 0 2px #111}
-.chip.rol{background:var(--acento-suave);color:#111}
-.borde-urgente,.borde-vencido{border-left:6px solid var(--ur-t)}
-.borde-porvencer{border-left:6px solid #C2410C}
-.borde-sinreporte{border-left:6px solid var(--sr-t)}
-.borde-ok{border-left:6px solid var(--ok-t)}
+.chip{background:#F1F5F9;color:#334155}
+.chip.ok .ico{color:var(--ok-t)}
+.chip.porvencer .ico{color:#C2410C}
+.chip.urgente .ico,.chip.vencido .ico{color:#B91C1C}
+.chip.sinreporte .ico{color:#64748B}
+.chip.urgente,.chip.vencido{color:#7F1D1D}
+.chip.arrendado,.chip.disponible,.chip.rol{background:#F1F5F9;color:#111}
+.chip.disponible{background:#fff;box-shadow:inset 0 0 0 1px var(--borde)}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 
 /* KPIs */
@@ -129,9 +127,9 @@ main{max-width:1120px;margin:0 auto;padding:20px 16px 48px}
 a.kpi{cursor:pointer}
 .kpi .n{font-family:Lexend;font-size:2rem;font-weight:700;line-height:1}
 .kpi .l{display:flex;align-items:center;gap:.35rem;font-weight:600;margin-top:.35rem}
-.kpi.ok{background:var(--ok-f);color:var(--ok-t)} .kpi.porvencer{background:var(--pv-f);color:var(--pv-t)}
-.kpi.urgente{background:var(--ur-f);color:var(--ur-t)} .kpi.sinreporte{background:var(--sr-f);color:var(--sr-t)}
-.kpi.marca{background:#111;color:#fff} .kpi.marca .ico{color:var(--acento)}
+.kpi .l{color:var(--texto-2)}
+.kpi.ok .ico{color:var(--ok-t)} .kpi.porvencer .ico{color:#C2410C}
+.kpi.urgente .ico{color:#B91C1C} .kpi.sinreporte .ico{color:#64748B}
 
 /* Listas */
 .item{display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit}
@@ -142,8 +140,8 @@ a.kpi{cursor:pointer}
 .aviso-fila .cuerpo{flex:1;min-width:0;display:flex;flex-direction:column}
 .tipo{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--texto-2)}
 .chip-ico{width:38px;height:38px;border-radius:10px;display:grid;place-items:center;flex:none}
-.chip-ico.ok{background:var(--ok-f);color:var(--ok-t)} .chip-ico.porvencer{background:var(--pv-f);color:var(--pv-t)}
-.chip-ico.urgente,.chip-ico.vencido{background:var(--ur-f);color:var(--ur-t)} .chip-ico.sinreporte{background:var(--sr-f);color:var(--sr-t)}
+.chip-ico{background:#F1F5F9;color:#64748B}
+.chip-ico.ok{color:var(--ok-t)} .chip-ico.porvencer{color:#C2410C} .chip-ico.urgente,.chip-ico.vencido{color:#B91C1C}
 .dl{display:grid;grid-template-columns:auto 1fr;gap:.3rem 1rem;margin:0 0 .5rem}
 .dl dt{color:var(--texto-2)} .dl dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
 .persona{display:flex;gap:12px;align-items:flex-start}
@@ -154,9 +152,9 @@ a.kpi{cursor:pointer}
 
 /* Barras */
 .barra{height:14px;border-radius:7px;background:#E2E8F0;overflow:hidden;margin:.4rem 0}
-.barra > span{display:block;height:100%;background:var(--ok-t)}
-.barra.porvencer > span{background:#C2410C} .barra.urgente > span,.barra.vencido > span{background:var(--ur-t)}
-.barra.marca > span{background:#111}
+.barra{height:8px;background:#E2E8F0}
+.barra > span{display:block;height:100%;background:#64748B}
+.barra.urgente > span,.barra.vencido > span{background:#B91C1C}
 
 /* Formularios */
 label.campo{display:block;font-weight:600;margin-bottom:12px}
@@ -206,9 +204,33 @@ th{color:var(--texto-2);font-weight:600}
 .filtros .btn{flex:none}
 .filtros .btn[aria-pressed="true"]{background:var(--primario);color:#fff}
 .graf{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:8px}
-.graf span{flex:1;background:var(--primario);border-radius:3px 3px 0 0;min-height:2px}
+.graf span{flex:1;background:#94A3B8;border-radius:3px 3px 0 0;min-height:2px}
 .graf-ejes{display:flex;justify-content:space-between;color:var(--texto-2);font-size:.8rem}
-.nota{background:var(--acento-suave);border-color:var(--acento)}
+.nota{background:#F8FAFC}
+
+/* Listas resumidas: una fila por elemento */
+.lista{background:#fff;border:1px solid var(--borde);border-radius:var(--radio);overflow:hidden;margin-bottom:16px}
+.lista-cab,.lista-fila{display:grid;grid-template-columns:var(--cols);gap:12px;align-items:center;padding:12px 16px}
+.lista-cab{background:#F8FAFC;font-size:.75rem;font-weight:700;color:var(--texto-2);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--borde)}
+.lista-fila{border-top:1px solid #E2E8F0;color:inherit;text-decoration:none}
+.lista-cab + .lista-fila{border-top:0}
+a.lista-fila:hover{background:#F8FAFC}
+.celda-pri{min-width:0}
+.celda-pri b{display:block;overflow-wrap:anywhere}
+.sub{display:block;color:var(--texto-2);font-size:.88rem;overflow-wrap:anywhere}
+.solo-movil{display:none}
+.estado{display:inline-flex;align-items:center;gap:.45rem;font-size:.92rem;white-space:nowrap}
+.estado::before{content:"";width:8px;height:8px;border-radius:50%;background:#94A3B8;flex:none}
+.estado.ok::before{background:var(--ok-t)} .estado.porvencer::before{background:#C2410C} .estado.urgente::before,.estado.vencido::before{background:#B91C1C}
+.avatar.chica{width:34px;height:34px;font-size:.8rem;background:#F1F5F9;color:#111}
+details.tarjeta summary{cursor:pointer;min-height:28px}
+.lista-simple{margin:0;padding-left:1.1rem;color:var(--texto-2)}
+@media (max-width:719px){
+  .lista-cab{display:none}
+  .lista-fila{grid-template-columns:minmax(0,1fr) auto}
+  .lista-fila .opc{display:none}
+  .solo-movil{display:inline}
+}
 
 /* Simulación de WhatsApp */
 .chat{display:flex;flex-direction:column;height:min(680px,calc(100dvh - 200px));min-height:420px;max-width:520px;margin:0 auto;border:1px solid var(--borde);border-radius:var(--radio);overflow:hidden;background:#ECE5DD}
@@ -246,7 +268,7 @@ th{color:var(--texto-2);font-weight:600}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda">Demostración · datos de ejemplo · versión 5</div>
+  <div class="demo-banda">Demostración · datos de ejemplo · versión 6</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -590,7 +612,7 @@ const filaAtencion = it => `<a class="aviso-fila" href="${it.href}"><span class=
   <span class="cuerpo"><span class="tipo">${esc(it.tipo)}</span><b>${esc(it.titulo)}</b><span class="sec">${esc(it.detalle)}</span></span>${ic('chevron')}</a>`;
 function filaCamion(c) {
   const g = estadoGeneral(c), rt = estadoRT(c), h = estadoHoras(c), sr = sinReporte(c), k = contrato(c.contratoId);
-  return `<a class="tarjeta item borde-${g}" href="#camion/${c.id}">
+  return `<a class="tarjeta item" href="#camion/${c.id}">
     <div class="cuerpo">
       <div class="fila entre" style="flex-wrap:wrap;gap:6px"><span class="patente">${fmtPatente(c.patente)}</span>${chipArriendo(c)}</div>
       <div class="sec">${esc(c.tipo)} · ${esc(c.modelo)}</div>
@@ -755,24 +777,7 @@ function validar(cid, lid, ok) {
 }
 
 /* ============ Dueño: Contratos ============ */
-function tarjetaContrato(k) {
-  const ec = estadoContrato(k), cs = camionesDe(k);
-  const ini = new Date(dISO(k.inicio)), fin = new Date(dISO(k.termino));
-  const avance = Math.max(0, Math.min(100, (Date.now() - ini) / (fin - ini) * 100));
-  return `<section class="tarjeta borde-${ec.e}">
-    <div class="titulo-tarjeta" style="flex-wrap:wrap"><h2><a class="patente" style="font-size:1.15rem;letter-spacing:0" href="#contrato/${k.id}">${esc(k.empresa)}</a></h2>${chip(ec.e, ec.txt)}</div>
-    <p class="sec" style="margin:0">${esc(k.numero)} · ${esc(k.faena)}</p>
-    <p style="margin:.5rem 0 0"><b>${fecha(ini)}</b> al <b>${fecha(fin)}</b></p>
-    <div class="barra ${ec.e === 'ok' ? 'marca' : ec.e}" role="img" aria-label="${Math.round(avance)}% del plazo transcurrido"><span style="width:${avance}%"></span></div>
-    <div class="persona" style="margin:.75rem 0">
-      <span class="avatar">${iniciales(k.admin.nombre)}</span>
-      <div style="min-width:0"><b>${esc(k.admin.nombre)}</b> <span class="sec">· ${esc(k.admin.cargo)}</span><br><span class="sec" style="overflow-wrap:anywhere">${esc(k.admin.telefono)} · ${esc(k.admin.correo)}</span></div>
-    </div>
-    ${contactoBotones(k.admin)}
-    <div class="chips" style="margin:.75rem 0">${cs.map(c => `<a class="chip arrendado" style="text-decoration:none" href="#camion/${c.id}">${ic('truck')}${fmtPatente(c.patente)}</a>`).join('')}</div>
-    <div class="acciones"><a class="btn chico pri" href="#contrato/${k.id}">Ver detalle</a><a class="btn chico" href="#ficha/${k.id}">${ic('file')}Ficha</a></div>
-  </section>`;
-}
+const estado = (e, txt) => `<span class="estado ${e}">${esc(txt)}</span>`;
 VISTAS.contratos = () => {
   const ks = S.contratos.slice().sort((a, b) => a.termino.localeCompare(b.termino));
   const renegociar = ks.filter(k => estadoContrato(k).e !== 'ok').length;
@@ -780,11 +785,19 @@ VISTAS.contratos = () => {
   <div class="cab"><div><h1>Contratos de arriendo</h1><p class="sec" style="margin:0">Con quién está cada camión y hasta cuándo.</p></div>
     <a class="btn chico cta no-print" href="#editar-contrato/nuevo">${ic('plus')}Nuevo contrato</a></div>
   <div class="kpis k3">
-    ${kpi('marca', ks.length, 'Contratos vigentes', 'file')}
+    ${kpi('', ks.length, 'Contratos vigentes', 'file')}
     ${kpi('', S.camiones.filter(c => c.contratoId).length, 'Camiones arrendados', 'truck')}
-    ${kpi(renegociar ? 'porvencer' : 'ok', renegociar, 'Por renegociar', 'clock')}
+    ${kpi(renegociar ? 'porvencer' : '', renegociar, 'Por renegociar', 'clock')}
   </div>
-  ${ks.length ? ks.map(tarjetaContrato).join('') : '<div class="tarjeta vacio">No hay contratos vigentes.</div>'}`;
+  ${ks.length ? `<div class="lista" style="--cols:minmax(0,2.2fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1.3fr) 24px">
+    <div class="lista-cab"><span>Empresa</span><span>Camiones</span><span>Término</span><span>Estado</span><span></span></div>
+    ${ks.map(k => { const ec = estadoContrato(k); return `<a class="lista-fila" href="#contrato/${k.id}">
+      <span class="celda-pri"><b>${esc(k.empresa)}</b><span class="sub">${esc(k.numero)}<span class="solo-movil"> · ${nCam(camionesDe(k).length)} · hasta ${fecha(dISO(k.termino))}</span></span></span>
+      <span class="opc">${camionesDe(k).length}</span>
+      <span class="opc">${fecha(dISO(k.termino))}</span>
+      <span>${estado(ec.e, ec.txt)}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
+  </div>` : '<div class="tarjeta vacio">No hay contratos vigentes.</div>'}`;
 };
 VISTAS.contrato = id => {
   const k = contrato(id); if (!k) return VISTAS.contratos();
@@ -1026,41 +1039,35 @@ function copiar() { navigator.clipboard?.writeText(mensajeResumen()).then(() => 
 
 /* ============ Dueño: Usuarios y accesos ============ */
 function alcance(u) {
-  if (u.rol === 'dueno') return 'Ve y administra todo.';
-  if (u.rol === 'empleado') { const cs = S.camiones.filter(c => c.operador === u.id); return cs.length ? 'Registra horómetro de: ' + cs.map(c => fmtPatente(c.patente)).join(', ') : 'Sin camiones asignados.'; }
-  const k = contrato(u.contratoId); return k ? `Ve lo arrendado a ${k.empresa} (${nCam(camionesDe(k).length)}).` : 'Sin contrato asignado.';
+  if (u.rol === 'dueno') return 'Todo';
+  if (u.rol === 'empleado') { const cs = S.camiones.filter(c => c.operador === u.id); return cs.length ? cs.map(c => fmtPatente(c.patente)).join(', ') : 'Sin camiones asignados'; }
+  const k = contrato(u.contratoId); return k ? `${k.empresa} (${nCam(camionesDe(k).length)})` : 'Sin contrato asignado';
 }
 VISTAS.usuarios = () => {
   const cnt = r => S.usuarios.filter(u => u.rol === r).length;
   return `
   <div class="cab"><div><h1>Usuarios y accesos</h1><p class="sec" style="margin:0">Quién puede entrar a la app y qué puede ver.</p></div>
     <a class="btn chico cta no-print" href="#editar-usuario/nuevo">${ic('plus')}Agregar usuario</a></div>
-  <div class="kpis k3">
-    ${kpi('marca', cnt('dueno'), 'Dueños', 'building')}
-    ${kpi('', cnt('empleado'), 'Empleados', 'user')}
-    ${kpi('', cnt('cliente'), 'Clientes', 'users')}
+  <p class="sec">${cnt('dueno')} dueño · ${cnt('empleado')} empleados · ${cnt('cliente')} clientes</p>
+  <div class="lista" style="--cols:minmax(0,2fr) minmax(0,.8fr) minmax(0,2fr) minmax(0,1.1fr) auto">
+    <div class="lista-cab"><span>Nombre</span><span>Perfil</span><span>Puede ver</span><span>Acceso</span><span></span></div>
+    ${S.usuarios.map(u => `<div class="lista-fila">
+      <span class="celda-pri persona" style="align-items:center"><span class="avatar chica">${iniciales(u.nombre)}</span><span style="min-width:0"><b>${esc(u.nombre)}</b><span class="sub">${esc(u.correo)}<span class="solo-movil"> · ${ROL[u.rol]}${u.activo ? "" : " · Sin acceso"}</span></span></span></span>
+      <span class="opc">${ROL[u.rol]}</span>
+      <span class="opc sec">${esc(alcance(u))}</span>
+      <span class="opc">${estado(u.activo ? 'ok' : 'sinreporte', u.activo ? 'Con acceso' : 'Sin acceso')}<span class="sub">${u.acceso ? cuando(u.acceso) : 'Nunca ha entrado'}</span></span>
+      <a class="btn chico" href="#editar-usuario/${u.id}">Editar</a>
+    </div>`).join('')}
   </div>
-  <div class="grid grid-2">
-  ${S.usuarios.map(u => `<section class="tarjeta" style="margin:0">
-    <div class="persona"><span class="avatar" ${u.activo ? '' : 'style="background:#E2E8F0;color:#334155"'}>${iniciales(u.nombre)}</span>
-      <div style="flex:1;min-width:0">
-        <div class="fila entre" style="flex-wrap:wrap;gap:6px"><b>${esc(u.nombre)}</b><span class="chip rol">${ROL[u.rol]}</span></div>
-        <div class="sec" style="overflow-wrap:anywhere">${esc(u.correo)}</div>
-        <p style="margin:.4rem 0">${esc(alcance(u))}</p>
-        <div class="chips">${u.activo ? chip('ok', 'Con acceso') : chip('sinreporte', 'Sin acceso')}<span class="sec" style="align-self:center">${u.acceso ? 'Último ingreso: ' + cuando(u.acceso) : 'Nunca ha entrado'}</span></div>
-      </div></div>
-    <div class="acciones" style="margin-top:10px"><a class="btn chico" href="#editar-usuario/${u.id}">Editar acceso</a></div>
-  </section>`).join('')}
-  </div>
-  <section class="tarjeta nota" style="margin-top:16px">
-    <h2>Qué puede ver cada perfil</h2>
-    <div class="grid grid-3">
-      <div><h3>Dueño</h3><ul style="margin:0;padding-left:1.1rem"><li>Toda la flota y los contratos</li><li>Revisiones técnicas y horómetros</li><li>Avisos y configuración</li><li>Usuarios y accesos</li></ul></div>
-      <div><h3>Empleado</h3><ul style="margin:0;padding-left:1.1rem"><li>Solo los camiones que tiene asignados</li><li>Registrar horómetro con foto</li><li>No ve contratos ni precios</li></ul></div>
-      <div><h3>Cliente</h3><ul style="margin:0;padding-left:1.1rem"><li>Solo los camiones que arrienda</li><li>Vigencia de su contrato</li><li>Estado de revisión técnica y horómetro</li><li>Solo lectura</li></ul></div>
+  <details class="tarjeta">
+    <summary><b>Qué puede ver cada perfil</b></summary>
+    <div class="grid grid-3" style="margin-top:12px">
+      <div><h3>Dueño</h3><ul class="lista-simple"><li>Toda la flota y los contratos</li><li>Revisiones técnicas y horómetros</li><li>Avisos, configuración y usuarios</li></ul></div>
+      <div><h3>Empleado</h3><ul class="lista-simple"><li>Solo sus camiones asignados</li><li>Registrar horómetro con foto</li><li>No ve contratos</li></ul></div>
+      <div><h3>Cliente</h3><ul class="lista-simple"><li>Solo los camiones que arrienda</li><li>Vigencia de su contrato</li><li>Solo lectura</li></ul></div>
     </div>
     <p class="sec" style="margin:.75rem 0 0">Propuesta inicial: lo afinamos más adelante.</p>
-  </section>`;
+  </details>`;
 };
 VISTAS['editar-usuario'] = id => {
   const nuevo = id === 'nuevo';
