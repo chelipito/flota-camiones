@@ -246,7 +246,7 @@ th{color:var(--texto-2);font-weight:600}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda">Demostración · datos de ejemplo · versión 4</div>
+  <div class="demo-banda">Demostración · datos de ejemplo · versión 5</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -376,7 +376,7 @@ function crearDemo() {
     return { id: 'c' + (i + 1), patente, tipo, modelo, operador, limite, contratoId, rtVence: enDias(diasRT), lecturas };
   });
   return {
-    creado: Date.now(), rol: null, sinSenalDemo: false,
+    creado: Date.now(), rol: 'dueno', sinSenalDemo: false,
     config: { empresa: 'Transportes Ejemplo', telefono: '+56 9 0000 0000', wsp: '', correo: '',
       diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15 },
     usuarios, contratos, camiones
@@ -385,6 +385,7 @@ function crearDemo() {
 let S;
 try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
+if (!S.rol) S.rol = 'dueno'; // la app abre directo en la vista del dueño
 function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ } }
 
 /* ============ Reglas de negocio ============ */
@@ -492,7 +493,7 @@ const MENU = [
   ['avisos', 'bell', 'Avisos'], ['usuarios', 'users', 'Usuarios y accesos']
 ];
 const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
-const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración']]);
+const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
 function permitido(rol, r) { return rol === 'dueno' ? !['empleado', 'registrar', 'cliente'].includes(r) : PERMISOS[rol].includes(r); }
@@ -503,7 +504,8 @@ function leerRuta() {
 }
 function padre(r, arg) {
   switch (r) {
-    case 'inicio': case 'empleado': case 'cliente': return 'perfil';
+    case 'perfil': return HOME[S.rol];
+    case 'empleado': case 'cliente': return 'perfil';
     case 'registrar': return 'empleado';
     case 'wsp': return S.rol === 'dueno' ? 'horometros' : 'empleado';
     case 'camion': return 'flota';
@@ -525,7 +527,7 @@ function pintarMenu(r) {
     ${MENU.map(item).join('')}
     <div class="abajo">
       ${item(['ajustes', 'sliders', 'Configuración'])}
-      <a class="item-menu" href="#perfil">${ic('repeat')}<span>Cambiar perfil (demo)</span></a>
+      <a class="item-menu" href="#perfil" ${r === 'perfil' ? 'aria-current="page"' : ''}>${ic('repeat')}<span>Ver como empleado o cliente</span></a>
     </div>`;
   const n = avisos;
   const camp = $('#campana');
@@ -541,18 +543,17 @@ addEventListener('keydown', e => { if (e.key === 'Escape') cerrarMenu(); });
 const VISTAS = {};
 function render() {
   let { r, arg, q } = leerRuta();
-  if (!S.rol) r = 'perfil';
-  else if (!r) r = HOME[S.rol];
+  if (!r) r = HOME[S.rol];
   else if (r !== 'perfil' && (!VISTAS[r] || !permitido(S.rol, r))) r = HOME[S.rol];
-  const conSide = S.rol === 'dueno' && r !== 'perfil';
+  const conSide = S.rol === 'dueno';
   document.body.classList.toggle('con-side', conSide);
   const app = $('#app');
   app.className = (r === 'empleado' || r === 'registrar') ? 'vista-op' : '';
   app.innerHTML = VISTAS[r](arg, q);
   $('#btnMenu').hidden = !conSide;
   $('#campana').hidden = !conSide;
-  $('#btnVolver').hidden = r === 'perfil';
-  $('#marca').href = S.rol && r !== 'perfil' ? '#' + HOME[S.rol] : '#perfil';
+  $('#btnVolver').hidden = S.rol === 'dueno' && r === 'inicio'; // en el inicio del dueño no hay a dónde volver
+  $('#marca').href = '#' + HOME[S.rol];
   if (conSide) pintarMenu(r);
   pintarRed();
   const cm = $('#chatMsgs');
@@ -561,10 +562,10 @@ function render() {
   render.mover = false;
 }
 // Botón Volver: vuelve a la pantalla anterior; si se entró por un link directo, sube un nivel
-let pila = [location.hash || '#perfil'];
+let pila = [location.hash || '#' + HOME[S.rol]];
 let REG = null;
 addEventListener('hashchange', () => {
-  const h = location.hash || '#perfil';
+  const h = location.hash || '#' + HOME[S.rol];
   if (pila[pila.length - 1] !== h) { if (pila[pila.length - 2] === h) pila.pop(); else pila.push(h); }
   if (leerRuta().r !== 'registrar') REG = null;
   cerrarMenu(); render.mover = true; scrollTo(0, 0); render();
@@ -606,8 +607,8 @@ function filaCamion(c) {
 VISTAS.perfil = () => {
   const p = (rol, i, t, d) => `<button class="tarjeta perfil" onclick="elegirRol('${rol}')"><span class="ic">${ic(i)}</span><span><h2>${t}</h2><span class="sec">${d}</span></span></button>`;
   return `
-  <h1>Control de flota y arriendos</h1>
-  <p class="sec">Elige un perfil para ver cómo se ve la app para cada persona. Para cambiar de perfil, vuelve a esta pantalla.</p>
+  <h1>Ver la app como otro perfil</h1>
+  <p class="sec">Solo para la demostración: elige un perfil para ver la app como la vería cada persona. Para volver a tu vista, elige <b>Dueño</b>.</p>
   <div class="grid grid-3">
     ${p('dueno', 'building', 'Dueño', 'Ve y administra todo: flota, contratos, revisiones técnicas, horómetros y quién tiene acceso.')}
     ${p('empleado', 'user', 'Empleado', 'Registra el horómetro de los camiones arrendados con una foto, incluso sin señal.')}
