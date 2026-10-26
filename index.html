@@ -75,9 +75,11 @@ body:not(.con-side) .top{border-bottom:4px solid var(--acento)}
 .top .btn-ico .ico{width:24px;height:24px}
 .top .contador{position:absolute;top:3px;right:1px;background:#DC2626;color:#fff;font-size:.7rem;font-weight:700;border-radius:999px;min-width:18px;height:18px;display:grid;place-items:center;padding:0 4px;line-height:1}
 .top .avatar{display:none}
+.top .avatar .ico{width:20px;height:20px}
 .pill{display:inline-flex;align-items:center;gap:.35rem;border-radius:999px;padding:.2rem .65rem;font-size:.85rem;font-weight:600;white-space:nowrap}
 .top .pill{background:var(--top-btn);color:inherit}
 .top .pill.off{background:#FDE68A;color:#78350F}
+@media (max-width:400px){.top .pill:not(.off) .pill-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
 @media (max-width:480px){.top .volver:not([hidden]) ~ .marca .marca-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
 .demo-banda{background:var(--acento);color:var(--sobre-acento);text-align:center;font-size:.85rem;padding:.3rem 16px;font-weight:600}
 body.con-side .demo-banda{background:var(--acento-suave)}
@@ -121,8 +123,18 @@ main{max-width:1120px;margin:0 auto;padding:20px 16px 48px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 
 /* KPIs */
-.kpis{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-@media (min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}.kpis.k3{grid-template-columns:repeat(3,1fr)}}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.kpis.k3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (min-width:720px){.kpis{gap:12px}}
+@media (max-width:719px){
+  .kpis{gap:6px}
+  .kpi{padding:10px 3px;border-radius:10px;text-align:center}
+  .kpi .n{font-size:1.4rem}
+  .kpi .l{display:block;font-size:.72rem;font-weight:400;line-height:1.2;margin-top:.3rem}
+  .kpi .l .ico{display:none}
+  .kpi.urgente .n{color:#B91C1C} .kpi.porvencer .n{color:#C2410C} .kpi.ok .n{color:var(--ok-t)}
+  .top .marca-txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
 .kpi{border-radius:var(--radio);padding:14px;border:1px solid var(--borde);background:#fff;text-align:left;display:block;width:100%;color:inherit;text-decoration:none}
 a.kpi{cursor:pointer}
 .kpi .n{font-family:Lexend;font-size:2rem;font-weight:700;line-height:1}
@@ -268,7 +280,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda">Demostración · datos de ejemplo · versión 6</div>
+  <div class="demo-banda">Demostración · datos de ejemplo · versión 7</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -353,7 +365,7 @@ function crearDemo() {
   const base = hoy0().getTime();
   const enDias = d => isoLocal(base + d * DIA);
   const usuarios = [
-    { id: 'u0', nombre: 'Felipe', correo: 'dueno@ejemplo.cl', telefono: '+56 9 0000 0000', rol: 'dueno', activo: true, acceso: Date.now() },
+    { id: 'u0', nombre: 'Administración', correo: 'dueno@ejemplo.cl', telefono: '+56 9 0000 0000', rol: 'dueno', activo: true, acceso: Date.now() },
     { id: 'u1', nombre: 'Juan Pérez', correo: 'juan.perez@ejemplo.cl', telefono: '+56 9 0000 0011', rol: 'empleado', activo: true, acceso: base - DIA + 17 * 3600000 },
     { id: 'u2', nombre: 'Luis Soto', correo: 'luis.soto@ejemplo.cl', telefono: '+56 9 0000 0012', rol: 'empleado', activo: true, acceso: base - DIA + 18 * 3600000 },
     { id: 'u3', nombre: 'Pablo Contreras', correo: 'pcontreras@andessur.ejemplo', telefono: '+56 9 0000 0001', rol: 'cliente', contratoId: 'k1', activo: true, acceso: base - 3 * DIA },
@@ -408,6 +420,7 @@ let S;
 try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
 if (!S.rol) S.rol = 'dueno'; // la app abre directo en la vista del dueño
+S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ } }
 
 /* ============ Reglas de negocio ============ */
@@ -494,7 +507,7 @@ const enLinea = () => navigator.onLine && !S.sinSenalDemo;
 function pintarRed() {
   const el = $('#estadoRed');
   const cola = S.camiones.reduce((s, c) => s + c.lecturas.filter(l => l.sync === 'cola').length, 0);
-  if (enLinea()) { el.className = 'pill'; el.innerHTML = ic('wifi') + 'En línea'; }
+  if (enLinea()) { el.className = 'pill'; el.innerHTML = ic('wifi') + '<span class="pill-txt">En línea</span>'; }
   else { el.className = 'pill off'; el.innerHTML = ic('wifi-off') + 'Sin señal' + (cola ? ` (${cola})` : ''); }
   el.title = cola ? `${cola} registros por enviar` : '';
 }
@@ -555,7 +568,7 @@ function pintarMenu(r) {
   const camp = $('#campana');
   camp.innerHTML = ic('bell') + (n ? `<span class="contador">${n}</span>` : '');
   camp.setAttribute('aria-label', `Avisos: ${n} por revisar`);
-  $('#avatar').textContent = iniciales(dueno().nombre);
+  $('#avatar').innerHTML = ic('user');
   $('#migas').innerHTML = `<span class="seccion-marca">FLOTA</span><span aria-hidden="true">›</span><span>${esc(TITULO[base] || '')}</span>`;
 }
 function abrirMenu() { document.body.classList.add('menu-abierto'); $('#btnMenu').setAttribute('aria-expanded', 'true'); $('#side a').focus(); }
@@ -663,7 +676,7 @@ VISTAS.inicio = () => {
   const ocup = cs.length ? Math.round(arr / cs.length * 100) : 0;
   return `
   <div class="fecha-larga">${fechaLarga()}</div>
-  <h1>${saludo()}, ${esc(primerNombre(dueno().nombre))}</h1>
+  <h1>${saludo()}</h1>
   <p>Tienes <b>${cs.length} camiones</b>: ${arr} arrendados y ${disp} disponibles. ${items.length ? `Hay <b>${items.length} temas por revisar</b>.` : 'Todo está al día.'}</p>
   <div class="kpis">
     ${kpi('marca', cs.length, 'Flota total', 'truck', '#flota')}
@@ -1432,7 +1445,7 @@ VISTAS.cliente = () => {
   </section>`; }).join('')}
   <section class="tarjeta nota">
     <h2>¿Necesitas algo?</h2>
-    <p>Tu contacto en ${esc(S.config.empresa)}: <b>${esc(dueno().nombre)}</b> · ${esc(S.config.telefono)}</p>
+    <p>Contacto de ${esc(S.config.empresa)}: <b>${esc(S.config.telefono)}</b></p>
     ${contactoBotones({ telefono: S.config.telefono, correo: S.config.correo })}
   </section>
   <p class="sec">Vista de solo lectura. Lo que ve el cliente se definirá en detalle más adelante.</p>`;
