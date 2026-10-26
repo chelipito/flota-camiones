@@ -137,6 +137,7 @@ main{max-width:1120px;margin:0 auto;padding:20px 16px 48px}
 }
 .kpi{border-radius:var(--radio);padding:14px;border:1px solid var(--borde);background:#fff;text-align:left;display:block;width:100%;color:inherit;text-decoration:none}
 a.kpi{cursor:pointer}
+.kpi.activo{border-color:#111;box-shadow:inset 0 0 0 1px #111}
 .kpi .n{font-family:Lexend;font-size:2rem;font-weight:700;line-height:1}
 .kpi .l{display:flex;align-items:center;gap:.35rem;font-weight:600;margin-top:.35rem}
 .kpi .l{color:var(--texto-2)}
@@ -230,7 +231,7 @@ a.lista-fila:hover{background:#F8FAFC}
 .celda-pri{min-width:0}
 .celda-pri b{display:block;overflow-wrap:anywhere}
 .sub{display:block;color:var(--texto-2);font-size:.88rem;overflow-wrap:anywhere}
-.solo-movil{display:none}
+.solo-movil,.solo-movil-bloque{display:none}
 .estado{display:inline-flex;align-items:center;gap:.45rem;font-size:.92rem;white-space:nowrap}
 .estado::before{content:"";width:8px;height:8px;border-radius:50%;background:#94A3B8;flex:none}
 .estado.ok::before{background:var(--ok-t)} .estado.porvencer::before{background:#C2410C} .estado.urgente::before,.estado.vencido::before{background:#B91C1C}
@@ -239,9 +240,10 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .lista-simple{margin:0;padding-left:1.1rem;color:var(--texto-2)}
 @media (max-width:719px){
   .lista-cab{display:none}
-  .lista-fila{grid-template-columns:minmax(0,1fr) auto}
-  .lista-fila .opc{display:none}
+  .lista-fila{grid-template-columns:var(--cols-m,minmax(0,1fr) auto)}
+  .lista-fila .opc,.lista-fila .opc-sub,.opc-txt{display:none}
   .solo-movil{display:inline}
+  .solo-movil-bloque{display:block}
 }
 
 /* Simulación de WhatsApp */
@@ -280,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda">Demostración · datos de ejemplo · versión 7</div>
+  <div class="demo-banda">Demostración · datos de ejemplo · versión 8</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -613,6 +615,7 @@ function volverAtras() {
 function ir(h) { location.hash = h; }
 
 /* ============ Componentes ============ */
+const estado = (e, txt) => `<span class="estado ${e}">${esc(txt)}</span>`;
 const kpi = (cls, n, t, i, href) => `<${href ? `a href="${href}"` : 'div'} class="kpi ${cls}"><div class="n num">${n}</div><div class="l">${ic(i)}${t}</div></${href ? 'a' : 'div'}>`;
 const chipArriendo = c => c.contratoId ? `<span class="chip arrendado">${ic('building')}Arrendado</span>` : `<span class="chip disponible">${ic('check')}Disponible</span>`;
 function contactoBotones(p) {
@@ -623,21 +626,6 @@ function contactoBotones(p) {
 }
 const filaAtencion = it => `<a class="aviso-fila" href="${it.href}"><span class="chip-ico ${it.e}">${ic(ICO[it.e])}</span>
   <span class="cuerpo"><span class="tipo">${esc(it.tipo)}</span><b>${esc(it.titulo)}</b><span class="sec">${esc(it.detalle)}</span></span>${ic('chevron')}</a>`;
-function filaCamion(c) {
-  const g = estadoGeneral(c), rt = estadoRT(c), h = estadoHoras(c), sr = sinReporte(c), k = contrato(c.contratoId);
-  return `<a class="tarjeta item" href="#camion/${c.id}">
-    <div class="cuerpo">
-      <div class="fila entre" style="flex-wrap:wrap;gap:6px"><span class="patente">${fmtPatente(c.patente)}</span>${chipArriendo(c)}</div>
-      <div class="sec">${esc(c.tipo)} · ${esc(c.modelo)}</div>
-      ${k ? `<div class="sec"><b>${esc(k.empresa)}</b> · hasta ${fecha(dISO(k.termino))}</div>` : ''}
-      <div class="chips">
-        ${chip(rt.e, 'Rev. técnica: ' + rt.txt)}
-        ${chip(h.e, 'Horas: ' + h.txt)}
-        ${sr.si ? chip('sinreporte', `${sr.dias} días sin reporte`) : ''}
-      </div>
-    </div>${ic('chevron')}</a>`;
-}
-
 /* ============ Vista: Elegir perfil (demo) ============ */
 VISTAS.perfil = () => {
   const p = (rol, i, t, d) => `<button class="tarjeta perfil" onclick="elegirRol('${rol}')"><span class="ic">${ic(i)}</span><span><h2>${t}</h2><span class="sec">${d}</span></span></button>`;
@@ -693,7 +681,7 @@ VISTAS.inicio = () => {
     <div>
       <section class="tarjeta">
         <div class="titulo-tarjeta"><h2>Contratos</h2><a class="ver-todo" href="#contratos">Ver todos →</a></div>
-        ${ks.length ? ks.map(k => { const ec = estadoContrato(k); return `<a class="aviso-fila" href="#contrato/${k.id}"><span class="cuerpo"><b>${esc(k.empresa)}</b><span class="sec">${nCam(camionesDe(k).length)} · hasta ${fecha(dISO(k.termino))}</span><span class="chips">${chip(ec.e, ec.txt)}</span></span>${ic('chevron')}</a>`; }).join('') : '<p class="sec">Sin contratos activos.</p>'}
+        ${ks.length ? ks.map(k => { const ec = estadoContrato(k); return `<a class="aviso-fila" href="#contrato/${k.id}"><span class="cuerpo"><b>${esc(k.empresa)}</b><span class="sec">${nCam(camionesDe(k).length)} · hasta ${fecha(dISO(k.termino))}</span><span style="margin-top:2px">${estado(ec.e, ec.txt)}</span></span>${ic('chevron')}</a>`; }).join('') : '<p class="sec">Sin contratos activos.</p>'}
       </section>
       <section class="tarjeta">
         <h2>Ocupación de la flota</h2>
@@ -710,12 +698,23 @@ VISTAS.flota = (_, q) => {
   const f = q.get('f') || 'todos';
   const cs = S.camiones, arr = cs.filter(c => c.contratoId);
   const lista = (f === 'arrendados' ? arr : f === 'disponibles' ? cs.filter(c => !c.contratoId) : cs).slice().sort(ordenUrgencia);
-  const tab = (k, t, n) => `<a class="btn chico" href="#flota?f=${k}" aria-pressed="${f === k}">${t} (${n})</a>`;
+  const filtro = (k, n, t, i) => `<a href="#flota?f=${k}" class="kpi ${f === k ? 'activo' : ''}" aria-pressed="${f === k}"><div class="n num">${n}</div><div class="l">${ic(i)}${t}</div></a>`;
   return `
   <div class="cab"><div><h1>Flota</h1><p class="sec" style="margin:0">Todos tus camiones, arrendados y disponibles.</p></div>
-    <div class="acciones no-print"><a class="btn chico" href="#editar/nuevo">${ic('plus')}Agregar camión</a><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
-  <div class="filtros" role="group" aria-label="Filtrar">${tab('todos', 'Todos', cs.length)}${tab('arrendados', 'Arrendados', arr.length)}${tab('disponibles', 'Disponibles', cs.length - arr.length)}</div>
-  ${lista.length ? lista.map(filaCamion).join('') : '<div class="tarjeta vacio">No hay camiones en este grupo.</div>'}`;
+    <div class="acciones no-print"><a class="btn chico cta" href="#editar/nuevo">${ic('plus')}Agregar camión</a><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
+  <div class="kpis k3" role="group" aria-label="Filtrar la flota">
+    ${filtro('todos', cs.length, 'Todos', 'truck')}${filtro('arrendados', arr.length, 'Arrendados', 'building')}${filtro('disponibles', cs.length - arr.length, 'Disponibles', 'check')}
+  </div>
+  ${lista.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.8fr) minmax(0,1.4fr) minmax(0,1.2fr) 24px">
+    <div class="lista-cab"><span>Camión</span><span>Arriendo</span><span>Rev. técnica</span><span>Horómetro</span><span></span></div>
+    ${lista.map(c => { const k = contrato(c.contratoId), rt = estadoRT(c), h = estadoHoras(c), g = estadoGeneral(c); return `<a class="lista-fila" href="#camion/${c.id}">
+      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${k ? esc(k.empresa) : 'Disponible'}</span></span></span>
+      <span class="opc">${k ? `${esc(k.empresa)}<span class="sub">hasta ${fecha(dISO(k.termino))}</span>` : '<span class="sec">Disponible</span>'}</span>
+      <span class="opc">${estado(rt.e, rt.txt)}</span>
+      <span class="opc">${estado(h.e, h.txt)}</span>
+      <span class="solo-movil-bloque">${estado(g, ETQ[g])}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
+  </div>` : '<div class="tarjeta vacio">No hay camiones en este grupo.</div>'}`;
 };
 
 /* ============ Dueño: Detalle de camión ============ */
@@ -790,7 +789,6 @@ function validar(cid, lid, ok) {
 }
 
 /* ============ Dueño: Contratos ============ */
-const estado = (e, txt) => `<span class="estado ${e}">${esc(txt)}</span>`;
 VISTAS.contratos = () => {
   const ks = S.contratos.slice().sort((a, b) => a.termino.localeCompare(b.termino));
   const renegociar = ks.filter(k => estadoContrato(k).e !== 'ok').length;
@@ -958,17 +956,20 @@ VISTAS.revisiones = () => {
   return `
   <div class="cab"><div><h1>Revisiones técnicas</h1><p class="sec" style="margin:0">Ordenadas por fecha de vencimiento.</p></div></div>
   <div class="kpis k3">
-    ${kpi('urgente', n('urgente'), 'Vencidas o urgentes', 'alert')}
-    ${kpi('porvencer', n('porvencer'), 'Por vencer', 'clock')}
+    ${kpi(n('urgente') ? 'urgente' : '', n('urgente'), 'Vencidas o urgentes', 'alert')}
+    ${kpi(n('porvencer') ? 'porvencer' : '', n('porvencer'), 'Por vencer', 'clock')}
     ${kpi('ok', n('ok'), 'Al día', 'check')}
   </div>
-  ${cs.map(c => { const rt = estadoRT(c), k = contrato(c.contratoId); return `<section class="tarjeta borde-${rt.e}">
-    <div class="fila entre" style="flex-wrap:wrap;gap:6px"><a class="patente" href="#camion/${c.id}">${fmtPatente(c.patente)}</a>${chip(rt.e, rt.txt)}</div>
-    <p class="sec" style="margin:.2rem 0 .5rem">${esc(c.tipo)} · ${k ? 'Arrendado a ' + esc(k.empresa) : 'Disponible'}</p>
-    <p style="margin:0 0 .6rem">Vence el <b>${fecha(dISO(c.rtVence))}</b></p>
-    <div class="acciones no-print"><a class="btn chico" href="#editar/${c.id}">Actualizar fecha</a><a class="btn chico" href="#" onclick="toast('En la versión real aquí se abre el certificado (PDF o foto).');return false">${ic('file')}Certificado</a></div>
-  </section>`; }).join('')}
-  <p class="sec">Cuando un camión pase la revisión, actualiza la fecha y adjunta el certificado nuevo.</p>`;
+  <div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.8fr) minmax(0,1fr) minmax(0,1.5fr) 24px">
+    <div class="lista-cab"><span>Camión</span><span>Arriendo</span><span>Vence</span><span>Estado</span><span></span></div>
+    ${cs.map(c => { const rt = estadoRT(c), k = contrato(c.contratoId); return `<a class="lista-fila" href="#camion/${c.id}">
+      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}</span></span>
+      <span class="opc">${k ? esc(k.empresa) : '<span class="sec">Disponible</span>'}</span>
+      <span class="opc">${fecha(dISO(c.rtVence))}</span>
+      <span>${estado(rt.e, rt.txt)}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
+  </div>
+  <p class="sec">Cuando un camión pase la revisión, entra a su ficha y actualiza la fecha en <b>Editar datos</b>.</p>`;
 };
 
 /* ============ Dueño: Horómetros ============ */
@@ -982,30 +983,39 @@ VISTAS.horometros = () => {
   <div class="cab"><div><h1>Horómetros</h1><p class="sec" style="margin:0">Horas de motor de cada camión respecto de su límite.</p></div>
     <div class="acciones no-print"><a class="btn chico wsp" href="#wsp">${ic('send')}Probar registro por WhatsApp</a><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
   <div class="kpis k3">
-    ${kpi(cerca ? 'porvencer' : 'ok', cerca, 'Cerca del límite', 'gauge')}
-    ${kpi(sr ? 'sinreporte' : 'ok', sr, 'Sin reporte', 'wifi-off')}
-    ${kpi(pend.length ? 'porvencer' : 'ok', pend.length, 'Por validar', 'clipboard')}
+    ${kpi(cerca ? 'porvencer' : '', cerca, 'Cerca del límite', 'gauge')}
+    ${kpi(sr ? 'sinreporte' : '', sr, 'Sin reporte', 'wifi-off')}
+    ${kpi(pend.length ? 'porvencer' : '', pend.length, 'Por validar', 'clipboard')}
   </div>
-  ${pend.length ? `<h2>Registros por validar</h2><p class="sec">Compara el número con la foto. Si está bien, toca <b>Validar</b>.</p>
-  <div class="grid grid-2" style="margin-bottom:12px">${pend.map(({ c, l, ant }) => `<section class="tarjeta" style="margin:0">
-    <div class="fila entre"><a class="patente" href="#camion/${c.id}">${fmtPatente(c.patente)}</a><span class="sec">${cuando(l.fecha)}</span></div>
-    <div class="fila" style="margin:.6rem 0;align-items:flex-start">
-      <img src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro" style="width:120px;border-radius:8px;flex:none">
-      <div><div class="num" style="font-size:1.4rem;font-weight:700">${n1(l.valor)} h</div>
-      <div class="sec">${ant ? `+${n1(l.valor - ant.valor)} h desde ${cuando(ant.fecha)}` : 'Primer registro'}</div>
-      <div class="sec">${esc(usuario(l.usuario).nombre)}${l.origen === 'whatsapp' ? ' · vía WhatsApp' : ''}</div></div>
-    </div>
-    <div class="acciones"><button class="btn pri" style="flex:1" onclick="validar('${c.id}','${l.id}',true)">${ic('check')}Validar</button><button class="btn" onclick="validar('${c.id}','${l.id}',false)">Observar</button></div>
-  </section>`).join('')}</div>` : ''}
+  ${pend.length ? `<h2>Por validar</h2>
+  <div class="lista" style="--cols:56px minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.3fr) auto;--cols-m:56px minmax(0,1fr) auto">
+    <div class="lista-cab"><span>Foto</span><span>Camión</span><span>Lectura</span><span>Registró</span><span></span></div>
+    ${pend.map(({ c, l, ant }) => `<div class="lista-fila">
+      <img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)} h" onclick="verFoto(this.src)" style="cursor:zoom-in">
+      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${cuando(l.fecha)}<span class="solo-movil"> · ${n1(l.valor)} h</span></span></span>
+      <span class="opc"><b class="num">${n1(l.valor)} h</b><span class="sub">${ant ? `+${n1(l.valor - ant.valor)} h` : 'Primer registro'}</span></span>
+      <span class="opc">${esc(usuario(l.usuario).nombre)}<span class="sub">${l.origen === 'whatsapp' ? 'vía WhatsApp' : 'vía app'}</span></span>
+      <span class="acciones" style="gap:6px;flex-wrap:nowrap"><button class="btn chico pri" onclick="validar('${c.id}','${l.id}',true)" aria-label="Validar registro de ${fmtPatente(c.patente)}">${ic('check')}<span class="opc-txt">Validar</span></button><button class="btn chico" onclick="validar('${c.id}','${l.id}',false)">Observar</button></span>
+    </div>`).join('')}
+  </div>` : ''}
   <h2>Todos los camiones</h2>
-  ${cs.map(c => { const h = estadoHoras(c), u = ultima(c), s = sinReporte(c); return `<a class="tarjeta item borde-${h.e}" href="#camion/${c.id}"><div class="cuerpo">
-    <div class="fila entre" style="flex-wrap:wrap;gap:6px"><span class="patente">${fmtPatente(c.patente)}</span>${chip(h.e, h.txt)}</div>
-    <p style="margin:.3rem 0 0"><b class="num">${n1(h.actual)} h</b> <span class="sec">de ${n0(c.limite)} h</span></p>
-    <div class="barra ${h.e}"><span style="width:${Math.min(100, h.pct)}%"></span></div>
-    <div class="sec">${h.pct >= 100 ? 'Límite superado' : h.fechaLim ? `Llega al límite aprox. el ${fecha(h.fechaLim)}` : 'Sin uso reciente'} · Último registro: ${u ? cuando(u.fecha) : '—'}</div>
-    ${s.si ? `<div class="chips">${chip('sinreporte', `${s.dias} días sin reporte`)}</div>` : ''}
-  </div>${ic('chevron')}</a>`; }).join('')}`;
+  <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1.3fr) 24px">
+    <div class="lista-cab"><span>Camión</span><span>Horas</span><span>Uso del límite</span><span>Último registro</span><span></span></div>
+    ${cs.map(c => { const h = estadoHoras(c), u = ultima(c), s = sinReporte(c); return `<a class="lista-fila" href="#camion/${c.id}">
+      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${n0(h.actual)} de ${n0(c.limite)} h</span></span></span>
+      <span class="opc num">${n0(h.actual)}<span class="sub">de ${n0(c.limite)} h</span></span>
+      <span>${estado(h.e, h.txt)}<span class="sub opc-sub">${h.pct >= 100 ? 'Límite superado' : h.fechaLim ? 'Llega aprox. el ' + fecha(h.fechaLim) : 'Sin uso reciente'}</span></span>
+      <span class="opc">${u ? cuando(u.fecha) : '—'}${s.si ? `<span class="sub">${estado('sinreporte', s.dias + ' días sin reporte')}</span>` : ''}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
+  </div>`;
 };
+function verFoto(src) {
+  const d = document.createElement('dialog');
+  d.style.cssText = 'border:0;border-radius:12px;padding:8px;max-width:min(92vw,520px)';
+  d.innerHTML = `<img src="${src}" alt="Foto del horómetro" style="width:100%;display:block;border-radius:8px"><button class="btn chico" style="margin-top:8px;width:100%" onclick="this.closest('dialog').close()">Cerrar</button>`;
+  d.addEventListener('close', () => d.remove());
+  document.body.appendChild(d); d.showModal();
+}
 
 /* ============ Dueño: Avisos (WhatsApp / correo) ============ */
 const GRUPOS = [['Contrato', 'Contratos por vencer'], ['Revisión técnica', 'Revisión técnica'], ['Horómetro', 'Horómetro'], ['Sin reporte', 'Sin reporte']];
