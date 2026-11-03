@@ -64,8 +64,17 @@ async function procesar(msg: any, nombre: string) {
   if (error?.code === '23505') return; // Meta reenvió el mismo mensaje: ya estaba guardado
   if (error) { console.error(error); return responder(de, '⚠️ No pude guardar el registro. Intenta de nuevo en un momento.'); }
 
+  // Revisa los avisos automáticos al dueño (función "avisos") y trae cuánto falta para la mantención
+  let mantencion = '';
+  try {
+    const r = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/avisos`, { method: 'POST',
+      headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patente: cam.patente }) });
+    if (r.ok) mantencion = (await r.json()).resumen ?? '';
+  } catch (e) { console.error('No se pudieron revisar los avisos', e); }
+
   const resta = Number(cam.limite) - v;
-  await responder(de, `✅ Registrado ${cam.patente}: ${n1(v)} h.\n${resta > 0 ? `Le quedan ${n0(resta)} h para el límite de ${n0(Number(cam.limite))} h.` : '⚠️ Superó el límite de horas.'}`);
+  await responder(de, `✅ Registrado ${cam.patente}: ${n1(v)} h.\n${mantencion || (resta > 0 ? `Le quedan ${n0(resta)} h para el límite de ${n0(Number(cam.limite))} h.` : '⚠️ Superó el límite de horas.')}`);
 }
 
 Deno.serve(async (req) => {

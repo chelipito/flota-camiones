@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 16</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 17</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -606,11 +606,12 @@ function estadoHoras(c) {
   return { e, actual, pct, prom, resta, dias, fechaLim, txt: pct >= 100 ? 'Límite superado' : `${Math.floor(pct)}% del límite` };
 }
 /* Mantención preventiva cada S.config.intervaloMant horas de motor (250 h según el cliente).
-   Si no hay mantención registrada, se supone que la última fue en el último múltiplo del intervalo. */
+   Si no hay mantención registrada, se estima según la PRIMERA lectura (último múltiplo del intervalo bajo ella):
+   así, si el camión pasa la próxima mantención y nadie la registra, queda "atrasada". */
 function estadoMant(c) {
   const iv = S.config.intervaloMant, u = ultima(c), actual = u ? u.valor : 0;
   const m = (c.mantenciones || [])[(c.mantenciones || []).length - 1];
-  const base = m ? m.valor : Math.floor(actual / iv) * iv;
+  const primera = lecturasOk(c)[0], base = m ? m.valor : Math.floor((primera ? primera.valor : actual) / iv) * iv;
   const prox = base + iv, resta = prox - actual, prom = promedioDiario(c);
   const fechaProx = resta > 0 && prom >= 0.5 ? new Date(Date.now() + Math.ceil(resta / prom) * DIA) : null;
   let e = 'ok';
@@ -976,6 +977,7 @@ async function registrarDueno(ev, id) {
       const res = await fetch(`${SUPA_URL}/rest/v1/rpc/registrar_lectura`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_patente: c.patente, p_valor: v }) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
       toast(`Horómetro registrado: ${n1(v)} h`); FIRMA = ''; await traerLecturas();
+      revisarAvisos(c.patente);
     } catch (e) { toast('No se pudo registrar: ' + e.message); btn.disabled = false; }
     return;
   }
@@ -1241,7 +1243,7 @@ VISTAS.avisos = () => {
         <button class="btn" onclick="copiar()">${ic('copy')}Copiar</button>
       </div>
     </section>
-    <section class="tarjeta nota">
+    ${REAL ? tarjetaAvisosAuto() : `<section class="tarjeta nota">
       <h2>En la versión real</h2>
       <ul style="margin:0;padding-left:1.2rem">
         <li>El resumen se envía <b>solo</b>, por ejemplo todos los lunes a las 08:00.</li>
@@ -1250,9 +1252,48 @@ VISTAS.avisos = () => {
         <li>Aviso si un camión arrendado lleva más de ${S.config.diasSinReporte} días sin reporte.</li>
       </ul>
       <p class="sec" style="margin:.5rem 0 0">Los días y porcentajes se cambian en Configuración.</p>
-    </section>
+    </section>`}
   </div>`;
 };
+/* Avisos automáticos por WhatsApp al dueño (función "avisos" de Supabase) */
+async function llamarAvisos(cuerpo) {
+  if (!(await sesionVigente())) { sesionPerdida(); throw new Error('sesión'); }
+  const res = await fetch(`${SUPA_URL}/functions/v1/avisos`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error || 'Error ' + res.status);
+  return d;
+}
+async function revisarAvisos(patente) {
+  try { const d = await llamarAvisos({ patente }); if (d.enviados) toast('Se envió un aviso automático por WhatsApp'); } catch (e) { /* el registro ya quedó guardado */ }
+}
+async function avisoPrueba(btn) {
+  btn.disabled = true;
+  try { await llamarAvisos({ prueba: true }); toast('Aviso de prueba enviado. Revisa WhatsApp.'); }
+  catch (e) { if (e.message !== 'sesión') toast('No se pudo enviar: ' + e.message); }
+  btn.disabled = false;
+}
+let ENVIADOS = null;
+async function cargarEnviados() {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/avisos_enviados?select=detalle,enviado&order=enviado.desc&limit=10`, { headers: supaHeaders() });
+    ENVIADOS = res.ok ? await res.json() : [];
+  } catch (e) { ENVIADOS = []; }
+  const el = $('#enviados'); if (el) el.innerHTML = htmlEnviados();
+}
+const htmlEnviados = () => !ENVIADOS ? '<p class="sec">Cargando…</p>' : !ENVIADOS.length ? '<p class="sec">Todavía no se ha enviado ningún aviso automático.</p>'
+  : `<ul class="lista-simple">${ENVIADOS.map(a => `<li><span class="sec">${cuando(Date.parse(a.enviado))}</span><br>${esc(a.detalle).replace(/\n/g, '<br>')}</li>`).join('')}</ul>`;
+function tarjetaAvisosAuto() {
+  setTimeout(cargarEnviados);
+  const cfg = S.config;
+  return `<section class="tarjeta">
+      <h2>Avisos automáticos</h2>
+      <p class="sec">Cada vez que llega un registro del horómetro, la app revisa la <b>mantención (cada ${n0(cfg.intervaloMant)} h)</b> y el <b>límite de horas</b>. Si algo queda por vencer, urgente o atrasado, le llega un WhatsApp al dueño. Cada aviso llega una sola vez.</p>
+      ${cfg.wsp ? `<p>Se envían a: <b>${esc(cfg.wsp)}</b></p>` : `<div class="error" role="alert">Falta el número que recibe los avisos. Agrégalo en <a href="#ajustes">Configuración</a> (WhatsApp que recibe los avisos).</div>`}
+      <button class="btn no-print" onclick="avisoPrueba(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('send')}Enviar aviso de prueba</button>
+      <h3 style="margin-top:16px">Últimos avisos enviados</h3>
+      <div id="enviados">${htmlEnviados()}</div>
+    </section>`;
+}
 function copiar() { navigator.clipboard?.writeText(mensajeResumen()).then(() => toast('Mensaje copiado'), () => toast('No se pudo copiar')); }
 
 /* ============ Dueño: Usuarios y accesos ============ */
@@ -1398,7 +1439,7 @@ VISTAS.ajustes = () => {
     <div class="grid grid-2">
       ${campo('empresa', 'Nombre de la empresa', 'text')}
       ${campo('telefono', 'Teléfono de contacto', 'tel', '(lo ven los clientes)')}
-      ${campo('wsp', 'WhatsApp que recibe los avisos', 'tel', '(vacío = elegir al enviar)')}
+      ${campo('wsp', 'WhatsApp que recibe los avisos', 'tel', REAL ? '(avisos automáticos; con código de país, p. ej. +56 9 1234 5678)' : '(vacío = elegir al enviar)')}
       ${campo('correo', 'Correo que recibe los avisos', 'email')}
     </div>
     <h2 style="margin-top:8px">Cuándo avisar</h2>
