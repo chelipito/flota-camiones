@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 11</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 12</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -413,21 +413,87 @@ try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
 S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
-function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ } }
+function guardar() {
+  try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ }
+  if (NUBE) subirEstado(); // con sesión iniciada, los cambios se comparten con todos los equipos
+}
+var NUBE = false; // true cuando hay sesión y la app ya trajo el estado desde Supabase
 
 /* ============ Registro real por WhatsApp (Supabase) ============ */
-// Datos del proyecto de Supabase. La clave pública (anon) solo permite leer: lo define supabase/esquema.sql
+// Datos del proyecto de Supabase. La clave pública sola no da acceso: hay que iniciar sesión (supabase/login.sql)
 const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
-const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública: solo lectura
+const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
-// la clave nueva (sb_publishable_) va solo en apikey; la antigua (eyJ...) también en Authorization
-const supaHeaders = () => ({ apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) });
+
+/* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
+const CLAVE_SESION = 'flota-sesion';
+let SESION = null, RENOVANDO = null;
+try { SESION = JSON.parse(localStorage.getItem(CLAVE_SESION)); } catch (e) { SESION = null; }
+function guardarSesion(x) {
+  SESION = x; if (!x) NUBE = false;
+  try { x ? localStorage.setItem(CLAVE_SESION, JSON.stringify(x)) : localStorage.removeItem(CLAVE_SESION); } catch (e) { /* sin almacenamiento: dura mientras la página esté abierta */ }
+}
+async function pedirToken(tipo, cuerpo) {
+  const res = await fetch(`${SUPA_URL}/auth/v1/token?grant_type=${tipo}`, { method: 'POST', headers: { apikey: SUPA_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error_description || d.msg || d.message || 'Error ' + res.status);
+  guardarSesion({ access: d.access_token, refresh: d.refresh_token, vence: Date.now() + d.expires_in * 1000, correo: d.user && d.user.email });
+}
+async function sesionVigente() { // renueva el acceso si vence en menos de 2 minutos
+  if (!SESION) return false;
+  if (SESION.vence - Date.now() > 120000) return true;
+  if (!RENOVANDO) RENOVANDO = pedirToken('refresh_token', { refresh_token: SESION.refresh }).then(() => true, () => { guardarSesion(null); return false; }).finally(() => { RENOVANDO = null; });
+  return RENOVANDO;
+}
+// con sesión va el token del usuario; sin sesión, la clave nueva (sb_publishable_) va solo en apikey
+const supaHeaders = () => ({ apikey: SUPA_KEY, ...(SESION ? { Authorization: 'Bearer ' + SESION.access } : SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) });
+function sesionPerdida() { guardarSesion(null); render(); toast('Tu sesión terminó. Vuelve a entrar.'); }
+
+/* Estado compartido: camiones, contratos y configuración se guardan en la tabla estado_app (un solo registro).
+   Los registros del horómetro vienen de la tabla lecturas. Si dos personas editan a la vez, gana el último en guardar. */
+let VERSION_NUBE = null, SUBIDA = null;
+function subirEstado() {
+  clearTimeout(SUBIDA);
+  SUBIDA = setTimeout(async () => {
+    if (!(await sesionVigente())) return sesionPerdida();
+    S._v = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const { chat, ...datos } = S;
+    try {
+      const res = await fetch(`${SUPA_URL}/rest/v1/estado_app`, { method: 'POST',
+        headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ id: 1, datos, actualizado: new Date().toISOString() }) });
+      if (res.status === 401) return sesionPerdida();
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      VERSION_NUBE = S._v;
+    } catch (e) { toast('No se pudo guardar en línea. Revisa la conexión.'); }
+    SUBIDA = null;
+  }, 600);
+}
+async function bajarEstado() { // devuelve true si llegaron cambios hechos en otro equipo
+  if (SUBIDA) return false; // hay cambios propios por subir: no se pisan
+  const res = await fetch(`${SUPA_URL}/rest/v1/estado_app?select=datos&id=eq.1`, { headers: supaHeaders() });
+  if (res.status === 401) throw Object.assign(new Error('sesión'), { sesion: true });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const [fila] = await res.json();
+  NUBE = true;
+  if (!fila) { subirEstado(); return false; } // primera vez: se sube lo que hay en este equipo
+  if (fila.datos._v === VERSION_NUBE) return false;
+  VERSION_NUBE = fila.datos._v;
+  S = { ...fila.datos, rol: 'dueno', chat: S.chat, estados: fila.datos.estados || {} };
+  try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ }
+  return true;
+}
+
 let FIRMA = '', ULTIMO_ID = null;
 async function traerLecturas() {
+  if (!SESION) return; // sin sesión no se consulta nada (la pantalla de entrada ya está a la vista)
+  if (!(await sesionVigente())) return sesionPerdida();
   try {
+    const cambioEstado = await bajarEstado();
     const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: supaHeaders() });
+    if (res.status === 401) throw Object.assign(new Error('sesión'), { sesion: true });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const filas = await res.json();
     // Con un solo camión, la patente y el límite mandan desde Supabase: se cambian en un solo lugar (supabase/cambiar-camion.sql)
@@ -440,7 +506,7 @@ async function traerLecturas() {
     }
     $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : '');
     const firma = filas.map(f => f.id).join() + JSON.stringify(S.estados);
-    if (firma === FIRMA && !cambioCamion) return;
+    if (firma === FIRMA && !cambioCamion && !cambioEstado) return;
     FIRMA = firma;
     const ult = filas.length ? filas.reduce((a, b) => (a.id > b.id ? a : b)) : null;
     if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID && ult.origen === 'whatsapp') toast(`Llegó por WhatsApp: ${fmtPatente(ult.patente)} · ${n1(ult.valor)} h`);
@@ -457,9 +523,38 @@ async function traerLecturas() {
     const escribiendo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement && document.activeElement.tagName);
     if (!escribiendo) render();
   } catch (e) {
+    if (e.sesion) return sesionPerdida();
     $('#banda').textContent = 'Sin conexión con la base de datos · reintentando…';
   }
 }
+
+/* ============ Inicio de sesión ============ */
+function vistaLogin() {
+  return `<div class="tarjeta" style="max-width:420px;margin:24px auto">
+    <h1>Iniciar sesión</h1>
+    <p class="sec">Entra con el correo y la contraseña que te entregaron.</p>
+    <form onsubmit="entrar(event)">
+      <label class="campo">Correo<input name="correo" type="email" autocomplete="username" required></label>
+      <label class="campo">Contraseña<input name="clave" type="password" autocomplete="current-password" required></label>
+      <div id="errLogin" class="error" role="alert" hidden></div>
+      <button class="btn pri grande" style="width:100%">Entrar</button>
+    </form></div>`;
+}
+async function entrar(ev) {
+  ev.preventDefault();
+  const f = ev.target, btn = f.querySelector('button'), err = $('#errLogin');
+  btn.disabled = true; btn.textContent = 'Entrando…'; err.hidden = true;
+  try {
+    await pedirToken('password', { email: f.correo.value.trim(), password: f.clave.value });
+    FIRMA = ''; VERSION_NUBE = null;
+    await traerLecturas();
+    if (location.hash !== '#inicio') location.hash = '#inicio'; else render();
+  } catch (e) {
+    err.textContent = /invalid/i.test(e.message) ? 'Correo o contraseña incorrectos.' : 'No se pudo entrar: ' + e.message;
+    err.hidden = false; btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+function salir() { if (!confirm('¿Cerrar sesión en este equipo?')) return; guardarSesion(null); render(); }
 
 /* ============ Reglas de negocio ============ */
 const usuario = id => S.usuarios.find(u => u.id === id) || { nombre: '—' };
@@ -618,14 +713,15 @@ function render() {
   let { r, arg, q } = leerRuta();
   if (!r) r = HOME[S.rol];
   else if (!VISTAS[r] || !permitido(S.rol, r)) r = HOME[S.rol];
-  const conSide = S.rol === 'dueno';
+  const sinSesion = REAL && !SESION; // con Supabase, sin sesión solo se ve la pantalla para entrar
+  const conSide = S.rol === 'dueno' && !sinSesion;
   document.body.classList.toggle('con-side', conSide);
   const app = $('#app');
   app.className = (r === 'empleado' || r === 'registrar') ? 'vista-op' : '';
-  app.innerHTML = VISTAS[r](arg, q);
+  app.innerHTML = sinSesion ? vistaLogin() : VISTAS[r](arg, q);
   $('#btnMenu').hidden = !conSide;
   $('#campana').hidden = !conSide;
-  $('#btnVolver').hidden = S.rol === 'dueno' && r === 'inicio'; // en el inicio del dueño no hay a dónde volver
+  $('#btnVolver').hidden = sinSesion || (S.rol === 'dueno' && r === 'inicio'); // en el inicio del dueño no hay a dónde volver
   $('#marca').href = '#' + HOME[S.rol];
   if (conSide) pintarMenu(r);
   pintarRed();
@@ -1217,7 +1313,8 @@ VISTAS.ajustes = () => {
     </div>
     <button class="btn pri">Guardar configuración</button>
   </form>
-  <button class="btn no-print" onclick="reiniciar()">Reiniciar datos de ejemplo</button>`;
+  ${REAL ? `<div class="tarjeta"><h2>Sesión</h2><p class="sec">Conectado como <b>${esc((SESION && SESION.correo) || '')}</b>. Los cambios se comparten con todos los que entran a la app.</p>
+    <button class="btn no-print" onclick="salir()">Cerrar sesión</button></div>` : '<button class="btn no-print" onclick="reiniciar()">Reiniciar datos de ejemplo</button>'}`;
 };
 function guardarAjustes(ev) {
   ev.preventDefault();
@@ -1261,6 +1358,7 @@ async function guardarCamion(ev, id) {
     if (REAL) {
       const btn = ev.target.querySelector('button.pri'); btn.disabled = true; btn.textContent = 'Guardando…';
       try {
+        if (!(await sesionVigente())) { sesionPerdida(); return; }
         const res = await fetch(`${SUPA_URL}/rest/v1/rpc/agregar_camion`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
           body: JSON.stringify({ p_patente: d.patente, p_limite: d.limite, p_horometro: Number(d.inicial), p_fecha: new Date(fechaL).toISOString() }) });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
@@ -1272,9 +1370,13 @@ async function guardarCamion(ev, id) {
     if (REAL) { FIRMA = ''; traerLecturas(); }
   } else { Object.assign(camion(id), datos); guardar(); toast('Cambios guardados'); ir('camion/' + id); }
 }
-function quitarCamion(id) {
+async function quitarCamion(id) {
   const c = camion(id);
   if (!confirm(`¿Quitar ${fmtPatente(c.patente)} de la flota? Se borran también sus registros.`)) return;
+  if (REAL) {
+    const res = await fetch(`${SUPA_URL}/rest/v1/rpc/quitar_camion`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_patente: c.patente }) }).catch(() => null);
+    if (!res || !res.ok) { toast('No se pudo quitar. Revisa la conexión.'); return; }
+  }
   S.camiones = S.camiones.filter(x => x.id !== id); guardar(); toast('Camión quitado'); ir('flota');
 }
 
