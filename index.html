@@ -429,9 +429,17 @@ async function traerLecturas() {
     const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: { apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const filas = await res.json();
+    // Con un solo camión, la patente y el límite mandan desde Supabase: se cambian en un solo lugar (supabase/cambiar-camion.sql)
+    const rc = await fetch(`${SUPA_URL}/rest/v1/camiones?select=patente,limite`, { headers: { apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) } });
+    const cams = rc.ok ? await rc.json() : [];
+    let cambioCamion = false;
+    if (cams.length === 1 && S.camiones.length === 1) {
+      const c = S.camiones[0], k = cams[0];
+      if (c.patente !== k.patente || c.limite !== Number(k.limite)) { c.patente = k.patente; c.limite = Number(k.limite); cambioCamion = true; guardar(); }
+    }
     $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : '');
     const firma = filas.map(f => f.id).join() + JSON.stringify(S.estados);
-    if (firma === FIRMA) return;
+    if (firma === FIRMA && !cambioCamion) return;
     FIRMA = firma;
     const ult = filas.length ? filas.reduce((a, b) => (a.id > b.id ? a : b)) : null;
     if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID) toast(`Llegó por WhatsApp: ${fmtPatente(ult.patente)} · ${n1(ult.valor)} h`);
