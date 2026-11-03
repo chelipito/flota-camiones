@@ -1,15 +1,16 @@
--- Control de Flota · revisión automática de avisos todos los días a las 9:00 (hora de Chile)
--- Cómo usarlo: Supabase → SQL Editor → pestaña nueva (+) → pega todo esto → Run. Se ejecuta una sola vez.
--- Llama a la función "avisos", que revisa la revisión técnica (y también mantención y límite) de todos los camiones
--- y manda por WhatsApp lo que corresponda. Cada aviso llega una sola vez.
+-- Control de Flota · revisión automática de avisos a la hora que elige el dueño (Configuración → Alertas)
+-- Cómo usarlo: Supabase → SQL Editor → pestaña nueva (+) → pega todo esto → Run.
+-- Si ya lo habías ejecutado, ejecútalo de nuevo: reemplaza la tarea anterior.
+-- Llama cada hora a la función "avisos"; la función solo manda avisos y el resumen a la hora elegida en la app.
 
 create extension if not exists pg_cron;
 create extension if not exists pg_net;
 
--- 12:00 UTC = 9:00 en Chile con horario de verano (8:00 en invierno)
+-- Quita la tarea anterior (si existe) y la crea de nuevo: minuto 0 de cada hora
+select cron.unschedule(jobid) from cron.job where jobname = 'avisos-diarios';
 select cron.schedule(
   'avisos-diarios',
-  '0 12 * * *',
+  '0 * * * *',
   $$
   select net.http_post(
     url := 'https://fclxmlzzskweqwhnpfkq.supabase.co/functions/v1/avisos',

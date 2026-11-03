@@ -2,8 +2,8 @@
 // Le manda un WhatsApp automático al dueño cuando la mantención (cada X horas), el límite de horas o la
 // revisión técnica pasan a "por vencer", "urgente" o "atrasado/vencida". Cada aviso se manda una sola vez.
 // La llaman: la función "whatsapp" al recibir un registro, la app (registros, cambios y "Revisar ahora")
-// y una tarea programada de Supabase todos los días a las 9:00 (supabase/avisos-diarios.sql).
-// Configuración → Alertas → "Cómo te llegan los avisos": aviso al momento (sí/no) y resumen (nunca, diario o semanal).
+// y una tarea programada de Supabase que la llama cada hora (supabase/avisos-diarios.sql); solo trabaja a la hora elegida.
+// Configuración → Alertas → "Cómo te llegan los avisos": aviso al momento (sí/no), resumen (nunca, diario o semanal) y hora.
 // Usa los mismos secretos que la función "whatsapp" (WHATSAPP_TOKEN y WHATSAPP_PHONE_ID).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -93,6 +93,9 @@ Deno.serve(async (req) => {
 
   const { data: est } = await db.from('estado_app').select('datos').eq('id', 1).maybeSingle();
   const datos = est?.datos ?? {}, cfg = datos.config ?? {};
+  // Revisión programada (corre cada hora, sin sesión): solo trabaja a la hora elegida en Configuración
+  const horaChile = Number(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Santiago' })) % 24;
+  if (!conSesion && !patente && !prueba && horaChile !== Number(cfg.horaAvisos ?? 9)) return json({ enviados: 0, hora: horaChile });
   const destinos = String(cfg.wsp ?? '').split(/[,;]/).map((x) => x.replace(/\D/g, '')).filter((x) => x.length >= 8);
 
   // Aviso de prueba desde la app (Avisos → Enviar aviso de prueba)
@@ -131,7 +134,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Resumen programado (solo en la revisión diaria de las 9:00): todos los días o una vez por semana
+  // Resumen programado (solo en la revisión diaria, a la hora elegida): todos los días o una vez por semana
   const hoySemana = DIAS_SEMANA.indexOf(new Date().toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Santiago' }));
   const tocaResumen = cfg.resumenFrec === 'diario' || (cfg.resumenFrec === 'semanal' && Number(cfg.resumenDia ?? 1) === hoySemana);
   if (!conSesion && !patente && tocaResumen && destinos.length) {

@@ -293,7 +293,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 24</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 25</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -415,7 +415,7 @@ function crearDemo() {
   return {
     creado: Date.now(), rol: 'dueno', sinSenalDemo: false,
     config: { empresa: 'Transportes Ejemplo', telefono: '+56 9 0000 0000', wsp: '', correo: '',
-      diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15, intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, avisoInmediato: true, resumenFrec: 'nunca', resumenDia: 1 },
+      diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15, intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, avisoInmediato: true, resumenFrec: 'nunca', resumenDia: 1, horaAvisos: 9 },
     usuarios, contratos, camiones
   };
 }
@@ -424,7 +424,7 @@ try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
 S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
 // completa datos guardados con versiones anteriores (también al traer el estado desde Supabase)
-function completarDatos() { S.config = { intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, avisoInmediato: true, resumenFrec: 'nunca', resumenDia: 1, ...S.config }; }
+function completarDatos() { S.config = { intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, avisoInmediato: true, resumenFrec: 'nunca', resumenDia: 1, horaAvisos: 9, ...S.config }; }
 completarDatos();
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() {
@@ -1241,6 +1241,7 @@ function mensajeCamion(c) {
   const a = estadoRT(c), h = estadoHoras(c), k = contrato(c.contratoId);
   return `*${fmtPatente(c.patente)}* · ${c.tipo}${k ? `\n• Arrendado a ${k.empresa} hasta el ${fecha(dISO(k.termino))}` : ''}\n• Revisión técnica: ${a.txt.toLowerCase()} (${fecha(dISO(c.rtVence))})\n• Horómetro: ${n1(h.actual)} de ${n0(c.limite)} h (${Math.floor(h.pct)}%)${h.pct < 100 && h.fechaLim ? `, límite aprox. el ${fecha(h.fechaLim)}` : ''}`;
 }
+const hh = h => String(h).padStart(2, '0') + ':00';
 const listaContactos = v => String(v || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
 const linkWsp = txt => `https://wa.me/${(listaContactos(S.config.wsp)[0] || '').replace(/\D/g, '')}?text=${encodeURIComponent(txt)}`;
 VISTAS.avisos = () => {
@@ -1309,7 +1310,7 @@ function tarjetaAvisosAuto() {
   return `<section class="tarjeta">
       <h2>Avisos automáticos</h2>
       <p class="sec">${cfg.avisoInmediato ? 'Aviso al momento cuando algo pasa a por vencer, urgente o atrasado (una vez por etapa).' : 'Aviso al momento: apagado.'}
-        ${cfg.resumenFrec === 'diario' ? 'Resumen todos los días a las 9:00.' : cfg.resumenFrec === 'semanal' ? `Resumen cada ${['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][cfg.resumenDia]} a las 9:00.` : 'Sin resumen.'}
+        ${cfg.resumenFrec === 'diario' ? `Resumen todos los días a las ${hh(cfg.horaAvisos)}.` : cfg.resumenFrec === 'semanal' ? `Resumen cada ${['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][cfg.resumenDia]} a las ${hh(cfg.horaAvisos)}.` : 'Sin resumen.'}
         <a href="#ajustes?tab=alertas">Cambiar</a></p>
       ${cfg.wsp ? `<p>Se envían a: <b>${listaContactos(cfg.wsp).map(esc).join(', ')}</b> · <a href="#ajustes">cambiar</a></p>` : `<div class="error" role="alert">Falta el número que recibe los avisos. Agrégalo en <a href="#ajustes">Configuración → Empresa y contactos</a>.</div>`}
       <div class="acciones no-print"><button class="btn" onclick="avisoPrueba(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('send')}Enviar aviso de prueba</button>
@@ -1572,8 +1573,10 @@ function ajustesAlertas(cfg) {
           <option value="semanal" ${cfg.resumenFrec === 'semanal' ? 'selected' : ''}>Una vez por semana</option>
         </select></label>
       <label class="regla" id="fila-dia" ${cfg.resumenFrec === 'semanal' ? '' : 'hidden'}>Día:
-        <select name="resumenDia" style="width:auto">${DIAS.slice(1).map((d, i) => `<option value="${i + 1}" ${Number(cfg.resumenDia) === i + 1 ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></label>`, 'como',
-      'Llegan a los WhatsApp de Empresa y contactos. El resumen sale a las 9:00.')}
+        <select name="resumenDia" style="width:auto">${DIAS.slice(1).map((d, i) => `<option value="${i + 1}" ${Number(cfg.resumenDia) === i + 1 ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></label>
+      <label class="regla">Hora:
+        <select name="horaAvisos" style="width:auto">${Array.from({ length: 17 }, (_, i) => i + 6).map(h => `<option value="${h}" ${Number(cfg.horaAvisos) === h ? 'selected' : ''}>${hh(h)}</option>`).join('')}</select></label>`, 'como',
+      'A esa hora sale el resumen y se revisan las fechas (revisión técnica).')}
     ${tarjeta('Registro del horómetro', '<span class="etiqueta-canal app">Regla</span>', `
       <p class="regla" style="margin-top:0">✅ Siempre activo: el horómetro nunca puede bajar.</p>
       <label class="check"><input type="checkbox" name="validarSalto" ${cfg.validarSalto ? 'checked' : ''}> No aceptar más horas de las que pasaron desde el último registro</label>`, 'reg',
@@ -1587,7 +1590,7 @@ function ajustesAlertas(cfg) {
       <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>`, 'lim', 'Una sola vez. El límite se edita en la ficha del camión.')}
     ${tarjeta('Revisión técnica', auto, `
       <label class="regla">🟡 Avisar ${n('diasPorVencer', 'días antes del vencimiento')}</label>
-      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>`, 'rt', 'Se revisa todos los días a las 9:00.')}
+      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>`, 'rt', `Se revisa todos los días a las <span class="hora-txt">${hh(cfg.horaAvisos)}</span>.`)}
     ${tarjeta('Contratos de arriendo', app, `
       <label class="regla">🟡 Avisar para renegociar ${n('diasContratoAviso', 'días antes del término')}</label>
       <label class="regla">🔴 Urgente ${n('diasContratoUrgente', 'días antes')}</label>`, 'con')}
@@ -1608,8 +1611,9 @@ function pintarEjemplos(c) {
   const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = '<span class="t">Ejemplo</span>' + html; };
   const dia = d => fecha(hoy0().getTime() + d * DIA);
   const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+  document.querySelectorAll('.hora-txt').forEach(e => { e.textContent = hh(c.horaAvisos); });
   pon('como', `${c.avisoInmediato ? '🟡 Al momento: "HKTZ48: faltan 25 h para la mantención".' : 'Sin aviso al momento.'}<br>
-    ${c.resumenFrec === 'diario' ? '📋 Cada día a las 9:00: "Resumen: 3 pendientes…"' : c.resumenFrec === 'semanal' ? `📋 Cada ${DIAS[c.resumenDia] || 'lunes'} a las 9:00: "Resumen: 3 pendientes…"` : 'Sin resumen.'}`);
+    ${c.resumenFrec === 'diario' ? `📋 Cada día a las ${hh(c.horaAvisos)}: "Resumen: 3 pendientes…"` : c.resumenFrec === 'semanal' ? `📋 Cada ${DIAS[c.resumenDia] || 'lunes'} a las ${hh(c.horaAvisos)}: "Resumen: 3 pendientes…"` : 'Sin resumen.'}`);
   pon('reg', `Hace 2 h marcaba <b>7.450</b> y llega <b>7.540</b>:<br>
     ${c.validarSalto ? '❌ Se rechaza: no pudo sumar 90 h en 2 h.' : '⚠️ Se acepta igual (regla apagada).'}`);
   const prox = 7250 + (c.intervaloMant || 250);
@@ -1634,7 +1638,7 @@ function guardarAlertas(ev) {
   const TEXTO = ['validarSalto', 'avisoInmediato', 'resumenFrec'];
   for (const [k, v] of new FormData(ev.target)) if (!TEXTO.includes(k)) nuevo[k] = Math.max(0, Number(v) || 0);
   nuevo.validarSalto = ev.target.validarSalto.checked; nuevo.avisoInmediato = ev.target.avisoInmediato.checked;
-  nuevo.resumenFrec = ev.target.resumenFrec.value; nuevo.resumenDia = Number(ev.target.resumenDia.value) || 1;
+  nuevo.resumenFrec = ev.target.resumenFrec.value; nuevo.resumenDia = Number(ev.target.resumenDia.value) || 1; nuevo.horaAvisos = Number(ev.target.horaAvisos.value);
   if (nuevo.intervaloMant < 1) { toast('La mantención debe ser cada 1 hora o más'); return; }
   if (nuevo.horasMantAviso >= nuevo.intervaloMant) { toast('El aviso de mantención debe ser menor que el intervalo de mantención'); return; }
   const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica'], ['diasContratoUrgente', 'diasContratoAviso', 'Contratos']]
