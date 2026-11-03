@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 12</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 13</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -659,12 +659,13 @@ const MENU = [
   ['inicio', 'home', 'Inicio'], ['flota', 'truck', 'Flota'], ['contratos', 'file', 'Contratos'],
   ['revisiones', 'shield', 'Revisiones técnicas'], ['horometros', 'gauge', 'Horómetros'],
   ['avisos', 'bell', 'Avisos']
-]; // 'Usuarios y accesos' queda escondido mientras solo entre el dueño
+]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
+if (REAL) MENU.push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
 const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
 const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
-const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'usuarios', 'editar-usuario', ...(REAL ? ['wsp'] : [])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
+const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'editar-usuario', ...(REAL ? ['wsp'] : ['usuarios'])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
 function permitido(rol, r) { return rol === 'dueno' ? !ESCONDIDAS.includes(r) : PERMISOS[rol].includes(r); }
 function leerRuta() {
   const [path, qs = ''] = location.hash.slice(1).split('?');
@@ -1217,6 +1218,7 @@ function alcance(u) {
   const k = contrato(u.contratoId); return k ? `${k.empresa} (${nCam(camionesDe(k).length)})` : 'Sin contrato asignado';
 }
 VISTAS.usuarios = () => {
+  if (REAL) return vistaCuentas();
   const cnt = r => S.usuarios.filter(u => u.rol === r).length;
   return `
   <div class="cab"><div><h1>Usuarios y accesos</h1><p class="sec" style="margin:0">Quién puede entrar a la app y qué puede ver.</p></div>
@@ -1285,6 +1287,60 @@ function quitarUsuario(id) {
   S.usuarios = S.usuarios.filter(x => x.id !== id);
   S.camiones.forEach(c => { if (c.operador === id) c.operador = ''; });
   guardar(); toast('Usuario quitado'); ir('usuarios');
+}
+
+/* ============ Usuarios reales (función "usuarios" de Supabase) ============ */
+let CUENTAS = null;
+async function llamarUsuarios(metodo, extra = '', cuerpo) {
+  if (!(await sesionVigente())) { sesionPerdida(); throw new Error('sesión'); }
+  const res = await fetch(`${SUPA_URL}/functions/v1/usuarios${extra}`, { method: metodo,
+    headers: { ...supaHeaders(), ...(cuerpo ? { 'Content-Type': 'application/json' } : {}) }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error || 'Error ' + res.status);
+  return d;
+}
+async function cargarCuentas() {
+  try { CUENTAS = await llamarUsuarios('GET'); } catch (e) { CUENTAS = { error: e.message }; }
+  const el = $('#cuentas'); if (el) el.innerHTML = htmlCuentas();
+}
+function htmlCuentas() {
+  if (!CUENTAS) return '<p class="sec">Cargando…</p>';
+  if (CUENTAS.error) return `<div class="error" role="alert">No se pudo cargar la lista: ${esc(CUENTAS.error)}</div>`;
+  const yo = SESION && SESION.correo;
+  return `<div class="lista" style="--cols:minmax(0,2fr) minmax(0,1.2fr) auto">
+    <div class="lista-cab"><span>Correo</span><span>Último ingreso</span><span></span></div>
+    ${CUENTAS.map(u => `<div class="lista-fila">
+      <span class="celda-pri"><b>${esc(u.correo)}</b>${u.correo === yo ? '<span class="sub">Tú</span>' : ''}<span class="sub solo-movil">${u.ultimo ? 'Entró ' + cuando(Date.parse(u.ultimo)) : 'Nunca ha entrado'}</span></span>
+      <span class="opc">${u.ultimo ? cuando(Date.parse(u.ultimo)) : 'Nunca ha entrado'}</span>
+      ${u.correo === yo ? '<span></span>' : `<button class="btn chico" onclick="quitarCuenta('${u.id}','${esc(u.correo)}')">Quitar acceso</button>`}
+    </div>`).join('')}</div>`;
+}
+function vistaCuentas() {
+  setTimeout(cargarCuentas);
+  return `<div class="cab"><div><h1>Usuarios</h1><p class="sec" style="margin:0">Personas que pueden entrar a la app. Todas ven y pueden cambiar todo.</p></div></div>
+  <form class="tarjeta no-print" onsubmit="crearCuenta(event)">
+    <h2>Crear usuario</h2>
+    <label class="campo">Correo<input name="correo" type="email" required autocomplete="off"></label>
+    <label class="campo">Contraseña <span class="ayuda">(mínimo 8 caracteres; entrégasela a la persona)</span><input name="clave" type="text" minlength="8" required autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <button class="btn pri">${ic('plus')}Crear usuario</button>
+  </form>
+  <h2>Con acceso</h2>
+  <div id="cuentas">${htmlCuentas()}</div>`;
+}
+async function crearCuenta(ev) {
+  ev.preventDefault();
+  const f = ev.target, btn = f.querySelector('button'), correo = f.correo.value.trim();
+  btn.disabled = true;
+  try {
+    await llamarUsuarios('POST', '', { correo, clave: f.clave.value });
+    f.reset(); toast(`Usuario creado: ${correo}. Ya puede entrar con esa contraseña.`); cargarCuentas();
+  } catch (e) { if (e.message !== 'sesión') toast('No se pudo crear: ' + e.message); }
+  btn.disabled = false;
+}
+async function quitarCuenta(id, correo) {
+  if (!confirm(`¿Quitar el acceso a ${correo}? Ya no podrá entrar a la app.`)) return;
+  try { await llamarUsuarios('DELETE', '?id=' + encodeURIComponent(id)); toast('Acceso quitado'); cargarCuentas(); }
+  catch (e) { if (e.message !== 'sesión') toast('No se pudo quitar: ' + e.message); }
 }
 
 /* ============ Dueño: Configuración ============ */
