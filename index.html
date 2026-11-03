@@ -277,34 +277,53 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .redondo.enviar{background:#128C7E;color:#fff}
 .redondo .ico{width:22px;height:22px}
 @media (prefers-reduced-motion:no-preference){.btn,.kpi{transition:filter .15s}.btn:hover,.kpi:hover{filter:brightness(.95)}}
-/* Celular (dueño): pestañas abajo, barra superior blanca y simple, todo un poco más compacto. Mismo contenido que en el computador. */
+/* Celular (dueño), estilo tipo Facebook: nombre grande arriba con botones redondos, tarjetas de borde a borde,
+   pestañas abajo con línea en la activa y "Más" con accesos en cuadrícula. Mismo contenido que en el computador. */
 .tabbar{display:none}
 @media (max-width:899px){
-  body.con-side{--top-bg:#FFFFFF;--top-fg:#111111;--top-btn:rgba(0,0,0,.06);font-size:15px}
-  body.con-side .top{min-height:52px;padding:.35rem 12px;border-bottom:1px solid var(--borde)}
-  body.con-side .btn-menu,body.con-side .top .avatar,body.con-side #campana,body.con-side .no-movil{display:none !important}
+  body.con-side{--top-bg:#FFFFFF;--top-fg:#111111;--top-btn:#E4E6EB;--fondo:#E9EBEE;font-size:15px}
+  body.con-side .top{min-height:56px;padding:.35rem 12px;border-bottom:1px solid #DADDE1}
+  body.con-side .btn-menu,body.con-side .no-movil{display:none !important}
   body.con-side .top .pill:not(.off){display:none}
-  body.con-side .top .volver{min-height:40px;padding:0 .5rem}
+  body.con-side .top .marca{font-size:1.4rem;letter-spacing:-.02em}
+  body.con-side .top .marca .logo{width:1.25em;height:1.25em}
+  body.con-side .top .volver{min-height:40px;width:40px;padding:0;justify-content:center;border-radius:50%}
   body.con-side .top .volver .volver-txt{display:none}
-  body.con-side .top .marca{font-size:1rem}
+  body.con-side .top .volver:not([hidden]) ~ .marca{font-size:1.1rem}
   body.con-side .top .volver:not([hidden]) ~ .marca .logo{display:none}
   body.con-side .top .volver:not([hidden]) ~ .marca .marca-txt{position:static;width:auto;height:auto;overflow:hidden;clip:auto}
+  body.con-side #campana,body.con-side .top .avatar{display:grid !important;width:40px;height:40px;border-radius:50%;background:#E4E6EB;color:#111;place-items:center}
+  body.con-side .top .avatar{font-size:.85rem;text-decoration:none}
+  body.con-side #campana .ico{width:21px;height:21px}
   body.con-side .demo-banda:not(.alerta){display:none}
-  body.con-side main{padding:14px 12px calc(84px + env(safe-area-inset-bottom))}
+  body.con-side main{padding:12px 12px calc(84px + env(safe-area-inset-bottom))}
   body.con-side h1{font-size:1.3rem}
   body.con-side h2{font-size:1.05rem}
-  body.con-side .tarjeta{padding:14px;margin-bottom:10px}
+  /* tarjetas y listas de borde a borde, separadas por franjas grises */
+  body.con-side .tarjeta,body.con-side .lista{margin-left:-12px;margin-right:-12px;border-radius:0;border-left:0;border-right:0;margin-bottom:8px}
+  body.con-side .tarjeta{padding:14px 16px}
+  body.con-side .grid,body.con-side .grid-inicio{gap:0}
   body.con-side .btn{min-height:44px;padding:.5rem .9rem}
   body.con-side .btn.chico{min-height:38px;padding:.3rem .7rem;font-size:.9rem}
-  body.con-side .lista-fila{padding:11px 14px}
+  body.con-side .lista-fila{padding:11px 16px}
   body.con-side .cab{margin-bottom:10px}
-  body.con-side .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--borde);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
-  .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;color:#64748B;text-decoration:none;font-size:.72rem;font-weight:600;position:relative;border-radius:10px}
-  .tabbar a .ico{width:22px;height:22px}
+  body.con-side .kpi{border-radius:12px}
+  /* pestañas abajo: la activa en negro con una línea amarilla arriba */
+  body.con-side .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid #DADDE1;padding:0 2px env(safe-area-inset-bottom)}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:56px;color:#65676B;text-decoration:none;font-size:.68rem;font-weight:600;position:relative;white-space:nowrap}
+  .tabbar a .ico{width:24px;height:24px}
   .tabbar a[aria-current="page"]{color:#111}
-  .tabbar a[aria-current="page"] .ico{color:#111;background:var(--acento);border-radius:999px;padding:3px 12px;width:46px;height:28px;box-sizing:border-box}
-  .tabbar .badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;font-size:.7rem;display:grid;place-items:center;padding:0 4px}
+  .tabbar a[aria-current="page"]::before{content:"";position:absolute;top:0;left:14%;right:14%;height:3px;border-radius:0 0 3px 3px;background:var(--acento);box-shadow:0 1px 0 #111}
+  .tabbar .badge{position:absolute;top:5px;left:calc(50% + 6px);min-width:18px;height:18px;font-size:.7rem;display:grid;place-items:center;padding:0 4px}
+  #campana .contador{top:-2px;right:-3px}
 }
+/* "Más": perfil arriba y accesos en cuadrícula (como el menú de Facebook) */
+.menu-perfil{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+.menu-grilla{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.menu-grilla a{background:#fff;border-radius:12px;padding:12px;text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px;box-shadow:0 1px 2px rgba(0,0,0,.12);min-height:84px;position:relative}
+.menu-grilla a .ico{width:26px;height:26px}
+.menu-grilla a b{font-size:.95rem}
+.menu-grilla .badge{position:absolute;top:10px;right:10px}
 @media print{.tabbar{display:none !important}}
 @media print{.side,.scrim,.top,.demo-banda,.no-print{display:none !important}body.con-side .contenido{margin-left:0}main{padding:0}.tarjeta{break-inside:avoid}.papel{border:0;box-shadow:none;padding:0}}
 </style>
@@ -322,7 +341,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 27</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 28</div>
   <main id="app"></main>
   <nav class="tabbar no-print" id="tabbar" aria-label="Navegación principal"></nav>
 </div>
@@ -732,9 +751,9 @@ const MENU = [
   ['avisos', 'bell', 'Avisos']
 ]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
 if (REAL) MENU.push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
-const PESTAÑAS = ['inicio', 'flota', 'horometros', 'avisos'];
+const PESTAÑAS = ['inicio', 'flota', 'horometros', 'ajustes'];
 const SECCION = { mas: 'mas', wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
-const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil'], ['mi-cuenta', 'Mi cuenta'], ['mas', 'Más']]);
+const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil'], ['mi-cuenta', 'Mi cuenta'], ['mas', 'Menú']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
 const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'editar-usuario', ...(REAL ? ['wsp'] : ['usuarios', 'mi-cuenta'])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
@@ -788,7 +807,7 @@ const enCelular = () => matchMedia('(max-width:899px)').matches;
 function pintarTabbar(base, pend, avisos) {
   const tab = PESTAÑAS.includes(base) ? base : 'mas';
   const t = (k, i, txt, n) => `<a href="#${k}" ${tab === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${txt}</span>${n ? `<span class="badge">${n}</span>` : ''}</a>`;
-  $('#tabbar').innerHTML = t('inicio', 'home', 'Inicio') + t('flota', 'truck', 'Flota') + t('horometros', 'gauge', 'Horómetro', pend) + t('avisos', 'bell', 'Avisos', avisos) + t('mas', 'menu', 'Más');
+  $('#tabbar').innerHTML = t('inicio', 'home', 'Inicio') + t('flota', 'truck', 'Flota') + t('horometros', 'gauge', 'Horómetro', pend) + t('ajustes', 'sliders', 'Configuración') + t('mas', 'menu', 'Más');
 }
 function abrirMenu() { document.body.classList.add('menu-abierto'); $('#btnMenu').setAttribute('aria-expanded', 'true'); $('#side a').focus(); }
 function cerrarMenu() { document.body.classList.remove('menu-abierto'); $('#btnMenu').setAttribute('aria-expanded', 'false'); }
@@ -797,16 +816,20 @@ matchMedia('(max-width:899px)').addEventListener('change', () => render());
 
 const VISTAS = {};
 VISTAS.mas = () => {
-  const fila = (k, i, t, d) => `<a class="lista-fila" href="#${k}"><span class="celda-pri persona" style="align-items:center"><span class="chip-ico">${ic(i)}</span><span style="min-width:0"><b>${t}</b><span class="sub">${d}</span></span></span><span class="sec">${ic('chevron')}</span></a>`;
-  return `<h1>Más</h1>
-  <div class="lista" style="--cols-m:minmax(0,1fr) auto;--cols:minmax(0,1fr) auto">
-    ${fila('contratos', 'file', 'Contratos', 'Arriendos y fichas')}
-    ${fila('revisiones', 'shield', 'Revisiones técnicas', 'Vencimientos de la flota')}
-    ${REAL ? fila('usuarios', 'users', 'Usuarios', 'Quién entra a la app') : ''}
-    ${fila('ajustes', 'sliders', 'Configuración', 'Empresa, contactos y alertas')}
-    ${REAL ? fila('mi-cuenta', 'user', 'Mi cuenta', esc((SESION && SESION.correo) || '')) : ''}
+  const yo = SESION || {}, avisos = itemsAtencion().length;
+  const acceso = (k, i, t, color, n) => `<a href="#${k}"><span style="color:${color}">${ic(i)}</span><b>${t}</b>${n ? `<span class="badge">${n}</span>` : ''}</a>`;
+  return `<h1>Menú</h1>
+  ${REAL ? `<a class="tarjeta menu-perfil" href="#mi-cuenta"><span class="avatar">${yo.nombre ? iniciales(yo.nombre) : ic('user')}</span>
+    <span style="min-width:0"><b>${esc(yo.nombre || yo.correo || 'Mi cuenta')}</b><span class="sub">Ver mi cuenta</span></span></a>` : ''}
+  <div class="menu-grilla">
+    ${acceso('avisos', 'bell', 'Avisos', '#DC2626', avisos)}
+    ${acceso('contratos', 'file', 'Contratos', '#2563EB')}
+    ${acceso('revisiones', 'shield', 'Revisiones técnicas', '#16A34A')}
+    ${acceso('flota', 'truck', 'Flota', '#111111')}
+    ${REAL ? acceso('usuarios', 'users', 'Usuarios', '#7C3AED') : ''}
+    ${acceso('ajustes', 'sliders', 'Configuración', '#475569')}
   </div>
-  ${REAL ? '<button class="btn" style="width:100%" onclick="salir()">Cerrar sesión</button>' : ''}`;
+  ${REAL ? '<button class="btn" style="width:100%;background:#E4E6EB;border-color:#E4E6EB" onclick="salir()">Cerrar sesión</button>' : ''}`;
 };
 function render() {
   let { r, arg, q } = leerRuta();
