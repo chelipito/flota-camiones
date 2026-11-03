@@ -214,6 +214,12 @@ th{color:var(--texto-2);font-weight:600}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--texto);color:#fff;padding:.7rem 1.1rem;border-radius:10px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center}
 .vacio{text-align:center;color:var(--texto-2);padding:24px}
 .filtros{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
+.regla{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:.5rem 0}
+.regla input{width:6.5rem;text-align:right}
+.etiqueta-canal{display:inline-block;font-size:.8rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;background:var(--ok-f, #ecfdf5);color:var(--ok-t, #065f46);margin-left:6px;vertical-align:middle}
+.etiqueta-canal.app{background:#f1f5f9;color:#475569}
+.fila-contacto{display:flex;gap:8px;margin-bottom:8px}
+.fila-contacto input{flex:1;min-width:0}
 .filtros .btn{flex:none}
 .filtros .btn[aria-pressed="true"]{background:var(--primario);color:#fff}
 .graf{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:8px}
@@ -282,7 +288,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 17</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 18</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -1227,7 +1233,8 @@ function mensajeCamion(c) {
   const a = estadoRT(c), h = estadoHoras(c), k = contrato(c.contratoId);
   return `*${fmtPatente(c.patente)}* · ${c.tipo}${k ? `\n• Arrendado a ${k.empresa} hasta el ${fecha(dISO(k.termino))}` : ''}\n• Revisión técnica: ${a.txt.toLowerCase()} (${fecha(dISO(c.rtVence))})\n• Horómetro: ${n1(h.actual)} de ${n0(c.limite)} h (${Math.floor(h.pct)}%)${h.pct < 100 && h.fechaLim ? `, límite aprox. el ${fecha(h.fechaLim)}` : ''}`;
 }
-const linkWsp = txt => `https://wa.me/${(S.config.wsp || '').replace(/\D/g, '')}?text=${encodeURIComponent(txt)}`;
+const listaContactos = v => String(v || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
+const linkWsp = txt => `https://wa.me/${(listaContactos(S.config.wsp)[0] || '').replace(/\D/g, '')}?text=${encodeURIComponent(txt)}`;
 VISTAS.avisos = () => {
   const msg = mensajeResumen(), xs = itemsAtencion();
   return `
@@ -1235,7 +1242,7 @@ VISTAS.avisos = () => {
   <div class="grid-inicio">
     <section class="tarjeta">
       <div class="titulo-tarjeta"><h2>Vista previa</h2><span class="sec">${xs.length} avisos</span></div>
-      <p class="sec">Para: ${S.config.wsp ? esc(S.config.wsp) : 'eliges el contacto en WhatsApp'}</p>
+      <p class="sec">Para: ${S.config.wsp ? esc(listaContactos(S.config.wsp)[0]) : 'eliges el contacto en WhatsApp'}</p>
       <div class="burbuja">${esc(msg)}</div>
       <div class="acciones" style="margin-top:12px">
         <a class="btn wsp" style="flex:1" target="_blank" rel="noopener" href="${linkWsp(msg)}">${ic('send')}Enviar por WhatsApp</a>
@@ -1288,7 +1295,7 @@ function tarjetaAvisosAuto() {
   return `<section class="tarjeta">
       <h2>Avisos automáticos</h2>
       <p class="sec">Cada vez que llega un registro del horómetro, la app revisa la <b>mantención (cada ${n0(cfg.intervaloMant)} h)</b> y el <b>límite de horas</b>. Si algo queda por vencer, urgente o atrasado, le llega un WhatsApp al dueño. Cada aviso llega una sola vez.</p>
-      ${cfg.wsp ? `<p>Se envían a: <b>${esc(cfg.wsp)}</b></p>` : `<div class="error" role="alert">Falta el número que recibe los avisos. Agrégalo en <a href="#ajustes">Configuración</a> (WhatsApp que recibe los avisos).</div>`}
+      ${cfg.wsp ? `<p>Se envían a: <b>${listaContactos(cfg.wsp).map(esc).join(', ')}</b> · <a href="#ajustes">cambiar</a></p>` : `<div class="error" role="alert">Falta el número que recibe los avisos. Agrégalo en <a href="#ajustes">Configuración → Empresa y contactos</a>.</div>`}
       <button class="btn no-print" onclick="avisoPrueba(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('send')}Enviar aviso de prueba</button>
       <h3 style="margin-top:16px">Últimos avisos enviados</h3>
       <div id="enviados">${htmlEnviados()}</div>
@@ -1429,48 +1436,97 @@ async function quitarCuenta(id, correo) {
 }
 
 /* ============ Dueño: Configuración ============ */
-VISTAS.ajustes = () => {
-  const cfg = S.config;
-  const campo = (k, t, tipo = 'number', ayuda = '') => `<label class="campo">${t}${ayuda ? ` <span class="ayuda">${ayuda}</span>` : ''}<input name="${k}" type="${tipo}" value="${esc(cfg[k])}" ${tipo === 'number' ? 'min="0" inputmode="numeric"' : ''}></label>`;
+VISTAS.ajustes = (_, q) => {
+  const tab = q.get('tab') === 'alertas' ? 'alertas' : 'empresa', cfg = S.config;
+  const pestaña = (k, t) => `<a class="btn chico" href="#ajustes?tab=${k}" aria-pressed="${tab === k}">${t}</a>`;
   return `
   <h1>Configuración</h1>
-  <form class="tarjeta" onsubmit="guardarAjustes(event)">
-    <h2>Empresa y avisos</h2>
+  <nav class="filtros no-print" aria-label="Secciones de configuración">${pestaña('empresa', 'Empresa y contactos')}${pestaña('alertas', 'Alertas')}</nav>
+  ${tab === 'empresa' ? ajustesEmpresa(cfg) : ajustesAlertas(cfg)}`;
+};
+const filaContacto = (tipo, v = '') => `<div class="fila-contacto"><input name="${tipo}" type="${tipo === 'wsp' ? 'tel' : 'email'}" value="${esc(v)}"
+  placeholder="${tipo === 'wsp' ? '+56 9 1234 5678' : 'nombre@empresa.cl'}" aria-label="${tipo === 'wsp' ? 'WhatsApp' : 'Correo'}" autocomplete="off">
+  <button type="button" class="btn chico" onclick="this.parentElement.remove()" aria-label="Quitar">Quitar</button></div>`;
+function agregarContacto(tipo) {
+  const caja = $('#lista-' + tipo); caja.insertAdjacentHTML('beforeend', filaContacto(tipo)); caja.lastElementChild.querySelector('input').focus();
+}
+function ajustesEmpresa(cfg) {
+  const lista = tipo => (listaContactos(cfg[tipo]).length ? listaContactos(cfg[tipo]) : ['']).map(v => filaContacto(tipo, v)).join('');
+  return `<form class="tarjeta" onsubmit="guardarEmpresa(event)">
+    <h2>Datos de la empresa</h2>
     <div class="grid grid-2">
-      ${campo('empresa', 'Nombre de la empresa', 'text')}
-      ${campo('telefono', 'Teléfono de contacto', 'tel', '(lo ven los clientes)')}
-      ${campo('wsp', 'WhatsApp que recibe los avisos', 'tel', REAL ? '(avisos automáticos; con código de país, p. ej. +56 9 1234 5678)' : '(vacío = elegir al enviar)')}
-      ${campo('correo', 'Correo que recibe los avisos', 'email')}
+      <label class="campo">Nombre de la empresa<input name="empresa" required value="${esc(cfg.empresa)}"></label>
+      <label class="campo">Teléfono de contacto<input name="telefono" type="tel" value="${esc(cfg.telefono)}"></label>
     </div>
-    <h2 style="margin-top:8px">Cuándo avisar</h2>
-    <div class="grid grid-2">
-      ${campo('diasPorVencer', 'Revisión técnica "por vencer" desde', 'number', '(días antes)')}
-      ${campo('diasUrgente', 'Revisión técnica "urgente" desde', 'number', '(días antes)')}
-      ${campo('pctAviso', 'Horómetro "por vencer" desde', 'number', '(% del límite)')}
-      ${campo('pctUrgente', 'Horómetro "urgente" desde', 'number', '(% del límite)')}
-      ${campo('diasContratoAviso', 'Contrato "por renegociar" desde', 'number', '(días antes del término)')}
-      ${campo('diasContratoUrgente', 'Contrato "urgente" desde', 'number', '(días antes del término)')}
-      ${campo('diasSinReporte', 'Alerta "sin reporte" después de', 'number', '(días)')}
-    </div>
-    <h2 style="margin-top:8px">Mantención</h2>
-    <div class="grid grid-2">
-      ${campo('intervaloMant', 'Mantención cada', 'number', '(horas de motor)')}
-      ${campo('horasMantAviso', 'Mantención "por vencer" desde', 'number', '(horas antes)')}
-      ${campo('horasMantUrgente', 'Mantención "urgente" desde', 'number', '(horas antes)')}
-    </div>
-    <button class="btn pri">Guardar configuración</button>
+    <h2 style="margin-top:8px">WhatsApp que reciben las alertas <span class="etiqueta-canal">Automático</span></h2>
+    <p class="sec">A cada número le llega el aviso de mantención y del horómetro. Escríbelo con código de país.${REAL ? ' Mientras se use el número de prueba de Meta, cada número debe estar también en la lista "Para" de Meta.' : ''}</p>
+    <div id="lista-wsp">${lista('wsp')}</div>
+    <button type="button" class="btn chico" onclick="agregarContacto('wsp')">${ic('plus')}Agregar otro número</button>
+    <h2 style="margin-top:16px">Correos <span class="etiqueta-canal app">Envío manual</span></h2>
+    <p class="sec">Se usan en <a href="#avisos">Avisos</a> → "Correo" para mandar el resumen. El envío automático por correo aún no está disponible.</p>
+    <div id="lista-correo">${lista('correo')}</div>
+    <button type="button" class="btn chico" onclick="agregarContacto('correo')">${ic('plus')}Agregar otro correo</button>
+    <div style="margin-top:16px"><button class="btn pri">Guardar</button></div>
   </form>
   ${REAL ? `<div class="tarjeta"><h2>Sesión</h2><p class="sec">Conectado como <b>${esc((SESION && SESION.correo) || '')}</b>. Los cambios se comparten con todos los que entran a la app.</p>
     <button class="btn no-print" onclick="salir()">Cerrar sesión</button></div>` : '<button class="btn no-print" onclick="reiniciar()">Reiniciar datos de ejemplo</button>'}`;
-};
-function guardarAjustes(ev) {
+}
+function guardarEmpresa(ev) {
   ev.preventDefault();
-  const fd = new FormData(ev.target); const nuevo = { ...S.config };
-  for (const [k, v] of fd) nuevo[k] = typeof S.config[k] === 'number' ? Math.max(0, Number(v) || 0) : v.trim();
-  if (nuevo.diasUrgente > nuevo.diasPorVencer || nuevo.pctAviso > nuevo.pctUrgente || nuevo.diasContratoUrgente > nuevo.diasContratoAviso || nuevo.horasMantUrgente > nuevo.horasMantAviso) { toast('Revisa los valores: "urgente" debe estar más cerca que "por vencer"'); return; }
-  if (!nuevo.empresa) { toast('Falta el nombre de la empresa'); return; }
+  const fd = new FormData(ev.target);
+  const wsp = fd.getAll('wsp').map(x => x.trim()).filter(Boolean), correo = fd.getAll('correo').map(x => x.trim()).filter(Boolean);
+  const malo = wsp.find(x => x.replace(/\D/g, '').length < 10);
+  if (malo) { toast(`Revisa el número "${malo}": escríbelo con código de país, por ejemplo +56 9 1234 5678`); return; }
+  const empresa = fd.get('empresa').trim();
+  if (!empresa) { toast('Falta el nombre de la empresa'); return; }
+  S.config = { ...S.config, empresa, telefono: fd.get('telefono').trim(), wsp: wsp.join(', '), correo: correo.join(', ') };
+  guardar(); toast('Datos de la empresa guardados'); render();
+}
+function ajustesAlertas(cfg) {
+  const n = (k, unidad, extra = '') => `<input name="${k}" type="number" min="0" inputmode="numeric" value="${esc(cfg[k])}" required ${extra}> ${unidad}`;
+  const auto = '<span class="etiqueta-canal">WhatsApp automático</span>', app = '<span class="etiqueta-canal app">Se muestra en la app</span>';
+  return `<form onsubmit="guardarAlertas(event)">
+    <section class="tarjeta">
+      <h2>Mantención ${auto}</h2>
+      <label class="regla">Hacer mantención cada ${n('intervaloMant', 'horas de motor', 'min="1"')}</label>
+      <label class="regla">🟡 Avisar cuando falten ${n('horasMantAviso', 'horas')}</label>
+      <label class="regla">🔴 Avisar urgente cuando falten ${n('horasMantUrgente', 'horas')}</label>
+      <p class="sec" style="margin:0">Si pasa la mantención y nadie la registra, llega un aviso de "atrasada".</p>
+    </section>
+    <section class="tarjeta">
+      <h2>Horómetro: límite total de horas ${auto}</h2>
+      <label class="regla">🟡 Avisar cuando llegue al ${n('pctAviso', '% del límite', 'max="100"')}</label>
+      <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>
+      <p class="sec" style="margin:0">El límite de cada camión está en su ficha (Flota → camión).</p>
+    </section>
+    <section class="tarjeta">
+      <h2>Revisión técnica ${app}</h2>
+      <label class="regla">🟡 Avisar ${n('diasPorVencer', 'días antes del vencimiento')}</label>
+      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>
+    </section>
+    <section class="tarjeta">
+      <h2>Contratos de arriendo ${app}</h2>
+      <label class="regla">🟡 Avisar para renegociar ${n('diasContratoAviso', 'días antes del término')}</label>
+      <label class="regla">🔴 Urgente ${n('diasContratoUrgente', 'días antes')}</label>
+    </section>
+    <section class="tarjeta">
+      <h2>Camiones sin reporte ${app}</h2>
+      <label class="regla">Avisar si un camión arrendado pasa ${n('diasSinReporte', 'días sin registrar el horómetro')}</label>
+    </section>
+    <button class="btn pri" style="margin-bottom:16px">Guardar alertas</button>
+  </form>`;
+}
+function guardarAlertas(ev) {
+  ev.preventDefault();
+  const nuevo = { ...S.config };
+  for (const [k, v] of new FormData(ev.target)) nuevo[k] = Math.max(0, Number(v) || 0);
   if (nuevo.intervaloMant < 1) { toast('La mantención debe ser cada 1 hora o más'); return; }
-  S.config = nuevo; guardar(); toast('Configuración guardada'); render();
+  if (nuevo.horasMantAviso >= nuevo.intervaloMant) { toast('El aviso de mantención debe ser menor que el intervalo de mantención'); return; }
+  const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica'], ['diasContratoUrgente', 'diasContratoAviso', 'Contratos']]
+    .filter(([u, a]) => nuevo[u] > nuevo[a]).map(x => x[2]);
+  if (nuevo.pctAviso > nuevo.pctUrgente) malos.push('Horómetro');
+  if (malos.length) { toast(`Revisa ${malos.join(', ')}: el aviso urgente debe llegar después del primer aviso`); return; }
+  S.config = nuevo; guardar(); toast('Alertas guardadas'); render();
 }
 
 /* ============ Dueño: Agregar / editar camión ============ */
