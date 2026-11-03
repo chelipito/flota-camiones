@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 13</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 14</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -404,7 +404,7 @@ function crearDemo() {
   return {
     creado: Date.now(), rol: 'dueno', sinSenalDemo: false,
     config: { empresa: 'Transportes Ejemplo', telefono: '+56 9 0000 0000', wsp: '', correo: '',
-      diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15 },
+      diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15, intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10 },
     usuarios, contratos, camiones
   };
 }
@@ -412,6 +412,9 @@ let S;
 try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
 S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
+// completa datos guardados con versiones anteriores (también al traer el estado desde Supabase)
+function completarDatos() { S.config = { intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, ...S.config }; }
+completarDatos();
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() {
   try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ }
@@ -482,6 +485,7 @@ async function bajarEstado() { // devuelve true si llegaron cambios hechos en ot
   if (fila.datos._v === VERSION_NUBE) return false;
   VERSION_NUBE = fila.datos._v;
   S = { ...fila.datos, rol: 'dueno', chat: S.chat, estados: fila.datos.estados || {} };
+  completarDatos();
   try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ }
   return true;
 }
@@ -601,6 +605,18 @@ function estadoHoras(c) {
   const fechaLim = dias != null ? new Date(Date.now() + dias * DIA) : null;
   return { e, actual, pct, prom, resta, dias, fechaLim, txt: pct >= 100 ? 'Límite superado' : `${Math.floor(pct)}% del límite` };
 }
+/* Mantención preventiva cada S.config.intervaloMant horas de motor (250 h según el cliente).
+   Si no hay mantención registrada, se supone que la última fue en el último múltiplo del intervalo. */
+function estadoMant(c) {
+  const iv = S.config.intervaloMant, u = ultima(c), actual = u ? u.valor : 0;
+  const m = (c.mantenciones || [])[(c.mantenciones || []).length - 1];
+  const base = m ? m.valor : Math.floor(actual / iv) * iv;
+  const prox = base + iv, resta = prox - actual, prom = promedioDiario(c);
+  const fechaProx = resta > 0 && prom >= 0.5 ? new Date(Date.now() + Math.ceil(resta / prom) * DIA) : null;
+  let e = 'ok';
+  if (resta <= 0) e = 'vencido'; else if (resta <= S.config.horasMantUrgente) e = 'urgente'; else if (resta <= S.config.horasMantAviso) e = 'porvencer';
+  return { e, base, prox, resta, fechaProx, ultima: m, txt: resta <= 0 ? `Atrasada ${n0(-resta)} h` : `Faltan ${n0(resta)} h` };
+}
 function sinReporte(c) {
   if (!c.contratoId) return { si: false, dias: null }; // un camión disponible no trabaja: no se le exige reporte
   const u = ultima(c); if (!u) return { si: true, dias: null };
@@ -608,8 +624,7 @@ function sinReporte(c) {
   return { si: dias > S.config.diasSinReporte, dias };
 }
 function estadoGeneral(c) {
-  const a = estadoRT(c).e, b = estadoHoras(c).e;
-  let e = RANGO[a] >= RANGO[b] ? a : b;
+  let e = [estadoRT(c).e, estadoHoras(c).e, estadoMant(c).e].reduce((x, y) => (RANGO[y] > RANGO[x] ? y : x));
   if (e === 'ok' && sinReporte(c).si) e = 'sinreporte';
   return e;
 }
@@ -625,7 +640,9 @@ function itemsAtencion() {
       msg: `${k.empresa}: contrato ${ec.txt.toLowerCase()} (${fechaCorta(dISO(k.termino))})`, href: '#contrato/' + k.id });
   });
   S.camiones.forEach(c => {
-    const p = fmtPatente(c.patente), rt = estadoRT(c), h = estadoHoras(c), s = sinReporte(c);
+    const p = fmtPatente(c.patente), rt = estadoRT(c), h = estadoHoras(c), s = sinReporte(c), m = estadoMant(c);
+    if (m.e !== 'ok') xs.push({ tipo: 'Mantención', e: m.e, titulo: p, detalle: `Mantención de las ${n0(m.prox)} h: ${m.txt.toLowerCase()}${m.fechaProx ? ' · aprox. el ' + fecha(m.fechaProx) : ''}`,
+      msg: `${p} (${c.tipo}): mantención de las ${n0(m.prox)} h, ${m.txt.toLowerCase()}`, href: '#camion/' + c.id });
     if (rt.e !== 'ok') xs.push({ tipo: 'Revisión técnica', e: rt.e, titulo: p, detalle: `${rt.txt} (${fecha(dISO(c.rtVence))})`,
       msg: `${p} (${c.tipo}): ${rt.e === 'vencido' ? rt.txt.toUpperCase() : rt.txt.toLowerCase() + ' (' + fechaCorta(dISO(c.rtVence)) + ')'}`, href: '#camion/' + c.id });
     if (h.e !== 'ok') xs.push({ tipo: 'Horómetro', e: h.e, titulo: p, detalle: h.txt + (h.pct < 100 && h.fechaLim ? ` · llega al límite aprox. el ${fecha(h.fechaLim)}` : ''),
@@ -893,6 +910,12 @@ VISTAS.camion = id => {
       </form>`}
     </section>
   </div>
+  ${(() => { const m = estadoMant(c); return `<section class="tarjeta borde-${m.e}">
+    <div class="titulo-tarjeta"><h2>Mantención cada ${n0(S.config.intervaloMant)} h</h2>${chip(m.e, m.txt)}</div>
+    <p style="margin:0">Próxima a las <b class="num">${n0(m.prox)} h</b>${m.fechaProx ? ` · aprox. el <b>${fecha(m.fechaProx)}</b>` : ''}</p>
+    <p class="sec" style="margin:.25rem 0 .75rem">Última: ${m.ultima ? `<b>${n0(m.ultima.valor)} h</b>${m.ultima.fecha ? ' (' + fecha(m.ultima.fecha) + ')' : ''}` : `${n0(m.base)} h (estimada, no hay mantención registrada)`}</p>
+    <button class="btn chico no-print" onclick="registrarMant('${c.id}')">${ic('check')}Registrar mantención hecha</button>
+  </section>`; })()}
   ${k ? `<section class="tarjeta">
     <h2>Horas de motor por día</h2>
     <p class="sec" style="margin:0">Últimos 14 días${sr.si ? ` · <b>${sr.dias} días sin reporte</b>` : ''}</p>
@@ -915,6 +938,17 @@ VISTAS.camion = id => {
     </table></div>
   </section>`;
 };
+function registrarMant(id) {
+  const c = camion(id), u = ultima(c, true), actual = u ? u.valor : 0, m = estadoMant(c);
+  const txt = prompt(`¿Con qué horómetro se hizo la mantención de ${fmtPatente(c.patente)}?`, n1(actual).replace(/\./g, ''));
+  if (txt === null) return;
+  const v = leerNumero(txt);
+  if (isNaN(v) || v <= 0) { toast('Escribe el horómetro solo con números.'); return; }
+  if (v > actual + 0.5) { toast(`No puede ser mayor que el horómetro actual (${n1(actual)} h).`); return; }
+  if (m.ultima && v <= m.ultima.valor) { toast(`Debe ser mayor que la mantención anterior (${n1(m.ultima.valor)} h).`); return; }
+  c.mantenciones = [...(c.mantenciones || []), { valor: v, fecha: Date.now() }];
+  guardar(); toast(`Mantención registrada. La próxima es a las ${n0(v + S.config.intervaloMant)} h.`); render();
+}
 function celdaEstado(l, cid) {
   if (l.estado === 'validado') return chip('ok', 'Validado');
   if (l.estado === 'observado') return chip('urgente', 'Observado') + (l.nota ? `<div class="sec" style="font-size:.85rem">${esc(l.nota)}</div>` : '');
@@ -1153,8 +1187,8 @@ VISTAS.horometros = () => {
   <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1.3fr) 24px">
     <div class="lista-cab"><span>Camión</span><span>Horas</span><span>Uso del límite</span><span>Último registro</span><span></span></div>
     ${cs.map(c => { const h = estadoHoras(c), u = ultima(c), s = sinReporte(c); return `<a class="lista-fila" href="#camion/${c.id}">
-      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${n0(h.actual)} de ${n0(c.limite)} h</span></span></span>
-      <span class="opc num">${n0(h.actual)}<span class="sub">de ${n0(c.limite)} h</span></span>
+      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${n0(h.actual)} de ${n0(c.limite)} h</span></span><span class="sub solo-movil">${estado(estadoMant(c).e, 'Mantención: ' + estadoMant(c).txt.toLowerCase())}</span></span>
+      <span class="opc num">${n0(h.actual)}<span class="sub">de ${n0(c.limite)} h</span><span class="sub">${estado(estadoMant(c).e, 'Mant.: ' + estadoMant(c).txt.toLowerCase())}</span></span>
       <span>${estado(h.e, h.txt)}<span class="sub opc-sub">${h.pct >= 100 ? 'Límite superado' : h.fechaLim ? 'Llega aprox. el ' + fecha(h.fechaLim) : 'Sin uso reciente'}</span></span>
       <span class="opc">${u ? cuando(u.fecha) : '—'}${s.si ? `<span class="sub">${estado('sinreporte', s.dias + ' días sin reporte')}</span>` : ''}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
@@ -1169,7 +1203,7 @@ function verFoto(src) {
 }
 
 /* ============ Dueño: Avisos (WhatsApp / correo) ============ */
-const GRUPOS = [['Contrato', 'Contratos por vencer'], ['Revisión técnica', 'Revisión técnica'], ['Horómetro', 'Horómetro'], ['Sin reporte', 'Sin reporte']];
+const GRUPOS = [['Contrato', 'Contratos por vencer'], ['Mantención', 'Mantención'], ['Revisión técnica', 'Revisión técnica'], ['Horómetro', 'Horómetro'], ['Sin reporte', 'Sin reporte']];
 function mensajeResumen() {
   const xs = itemsAtencion();
   const cab = `*${S.config.empresa} · Control de Flota*\nAvisos al ${fecha(Date.now())}\n`;
@@ -1367,6 +1401,12 @@ VISTAS.ajustes = () => {
       ${campo('diasContratoUrgente', 'Contrato "urgente" desde', 'number', '(días antes del término)')}
       ${campo('diasSinReporte', 'Alerta "sin reporte" después de', 'number', '(días)')}
     </div>
+    <h2 style="margin-top:8px">Mantención</h2>
+    <div class="grid grid-2">
+      ${campo('intervaloMant', 'Mantención cada', 'number', '(horas de motor)')}
+      ${campo('horasMantAviso', 'Mantención "por vencer" desde', 'number', '(horas antes)')}
+      ${campo('horasMantUrgente', 'Mantención "urgente" desde', 'number', '(horas antes)')}
+    </div>
     <button class="btn pri">Guardar configuración</button>
   </form>
   ${REAL ? `<div class="tarjeta"><h2>Sesión</h2><p class="sec">Conectado como <b>${esc((SESION && SESION.correo) || '')}</b>. Los cambios se comparten con todos los que entran a la app.</p>
@@ -1376,8 +1416,9 @@ function guardarAjustes(ev) {
   ev.preventDefault();
   const fd = new FormData(ev.target); const nuevo = { ...S.config };
   for (const [k, v] of fd) nuevo[k] = typeof S.config[k] === 'number' ? Math.max(0, Number(v) || 0) : v.trim();
-  if (nuevo.diasUrgente > nuevo.diasPorVencer || nuevo.pctAviso > nuevo.pctUrgente || nuevo.diasContratoUrgente > nuevo.diasContratoAviso) { toast('Revisa los valores: "urgente" debe estar más cerca que "por vencer"'); return; }
+  if (nuevo.diasUrgente > nuevo.diasPorVencer || nuevo.pctAviso > nuevo.pctUrgente || nuevo.diasContratoUrgente > nuevo.diasContratoAviso || nuevo.horasMantUrgente > nuevo.horasMantAviso) { toast('Revisa los valores: "urgente" debe estar más cerca que "por vencer"'); return; }
   if (!nuevo.empresa) { toast('Falta el nombre de la empresa'); return; }
+  if (nuevo.intervaloMant < 1) { toast('La mantención debe ser cada 1 hora o más'); return; }
   S.config = nuevo; guardar(); toast('Configuración guardada'); render();
 }
 
@@ -1397,6 +1438,7 @@ VISTAS.editar = id => {
     ${REAL && !nuevo ? '<p class="ayuda" style="margin-top:-.5rem">La patente y el límite están conectados con WhatsApp y no se cambian aquí.</p>' : ''}
     <label class="campo">Vencimiento de la revisión técnica<input name="rtVence" type="date" required value="${c.rtVence}"></label>
     ${nuevo ? `<label class="campo">Lectura actual del horómetro<input name="inicial" type="number" min="0.1" step="0.1" required inputmode="decimal"></label>
+    <label class="campo">Horómetro de la última mantención <span class="ayuda">(opcional; si no se sabe, se estima)</span><input name="ultMant" type="number" min="0" step="0.1" inputmode="decimal"></label>
     <label class="campo">¿Qué día se leyó? <span class="ayuda">(desde ahí se cuentan las horas para el próximo registro)</span><input name="fechaLectura" type="date" required max="${isoLocal(Date.now())}" value="${isoLocal(Date.now())}"></label>
     ${REAL ? '<p class="ayuda">Al guardar, el camión queda listo para registrar su horómetro por WhatsApp con su patente y el número.</p>' : ''}` : ''}
     <div class="acciones"><button class="btn pri" style="flex:1">Guardar</button>${nuevo ? '' : `<button type="button" class="btn peligro" onclick="quitarCamion('${id}')">Quitar de la flota</button>`}</div>
@@ -1420,7 +1462,8 @@ async function guardarCamion(ev, id) {
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
       } catch (e) { toast('No se pudo agregar: ' + e.message); btn.disabled = false; btn.textContent = 'Guardar'; return; }
     }
-    const c = { id: 'c' + Date.now(), contratoId: null, ...datos,
+    if (d.ultMant && Number(d.ultMant) > Number(d.inicial)) { toast('La última mantención no puede ser mayor que el horómetro actual'); return; }
+    const c = { id: 'c' + Date.now(), contratoId: null, ...datos, mantenciones: d.ultMant ? [{ valor: Number(d.ultMant), fecha: null }] : [],
       lecturas: [{ id: 'l' + Date.now(), fecha: fechaL, valor: Number(d.inicial), usuario: 'u0', quien: 'Lectura inicial', foto: false, estado: 'validado', sync: 'enviado' }] };
     S.camiones.push(c); guardar(); toast(REAL ? `Camión agregado. Ya puede registrar por WhatsApp: ${c.patente} y el número` : 'Camión agregado'); ir('camion/' + c.id);
     if (REAL) { FIRMA = ''; traerLecturas(); }
@@ -1689,10 +1732,10 @@ VISTAS.cliente = () => {
 
 /* ============ Reporte Excel (CSV) ============ */
 function exportarCSV() {
-  const cab = ['Patente', 'Tipo', 'Modelo', 'Estado arriendo', 'Empresa', 'Contrato vence', 'Horómetro actual', 'Límite horas', '% usado', 'Promedio h/día', 'Fecha límite aprox.', 'Vence rev. técnica', 'Días restantes RT', 'Último reporte', 'Estado'];
+  const cab = ['Patente', 'Tipo', 'Modelo', 'Estado arriendo', 'Empresa', 'Contrato vence', 'Horómetro actual', 'Límite horas', '% usado', 'Promedio h/día', 'Fecha límite aprox.', 'Vence rev. técnica', 'Días restantes RT', 'Próxima mantención (h)', 'Horas para mantención', 'Último reporte', 'Estado'];
   const filas = S.camiones.slice().sort(ordenUrgencia).map(c => {
     const h = estadoHoras(c), rt = estadoRT(c), u = ultima(c), k = contrato(c.contratoId);
-    return [fmtPatente(c.patente), c.tipo, c.modelo, k ? 'Arrendado' : 'Disponible', k ? k.empresa : '', k ? fecha(dISO(k.termino)) : '', n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fecha(dISO(c.rtVence)), rt.d, u ? fecha(u.fecha) : '', ETQ[estadoGeneral(c)]];
+    return [fmtPatente(c.patente), c.tipo, c.modelo, k ? 'Arrendado' : 'Disponible', k ? k.empresa : '', k ? fecha(dISO(k.termino)) : '', n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fecha(dISO(c.rtVence)), rt.d, estadoMant(c).prox, n0(estadoMant(c).resta), u ? fecha(u.fecha) : '', ETQ[estadoGeneral(c)]];
   });
   const csv = '﻿' + [cab, ...filas].map(f => f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const a = document.createElement('a');
