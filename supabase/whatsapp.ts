@@ -16,6 +16,7 @@ const PHONE_ID = Deno.env.get('WHATSAPP_PHONE_ID') ?? '';
 
 const n1 = (v: number) => v.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 const n0 = (v: number) => Math.round(v).toLocaleString('es-CL');
+const horas = (v: number) => (n1(v) === '1' ? '1 hora' : n1(v) + ' horas');
 
 // Mismas reglas que la app: "7.450" o "7 450" = 7450; "7450,5" o "7450.5" = 7450,5
 function leerNumero(txt: string) {
@@ -56,7 +57,7 @@ async function procesar(msg: any, nombre: string) {
   if (ult && v < Number(ult.valor)) return responder(de, `❌ ${v} es menor que la última lectura (${n1(Number(ult.valor))} h). El horómetro nunca baja: revisa el número.`);
   if (ult) {
     const pasaron = (Date.now() - Date.parse(ult.fecha)) / 3600000;
-    if (v - Number(ult.valor) > pasaron + 0.5) return responder(de, `❌ Son ${n1(v - Number(ult.valor))} horas más que la última vez, pero solo han pasado ${n1(pasaron)} horas. Revisa el número.`);
+    if (v - Number(ult.valor) > pasaron + 0.5) return responder(de, `❌ Son ${horas(v - Number(ult.valor))} más que la última vez, pero solo han pasado ${horas(pasaron)}. Revisa el número.`);
   }
 
   const { error } = await db.from('lecturas').insert({ patente: cam.patente, valor: v, origen: 'whatsapp', nombre, telefono: de, wamid: msg.id });
