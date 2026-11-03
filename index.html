@@ -293,7 +293,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 22</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 23</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -1563,17 +1563,17 @@ function ajustesAlertas(cfg) {
     ${tarjeta('Registro del horómetro', '<span class="etiqueta-canal app">Regla</span>', `
       <p class="regla" style="margin-top:0">✅ Siempre activo: el horómetro nunca puede bajar.</p>
       <label class="check"><input type="checkbox" name="validarSalto" ${cfg.validarSalto ? 'checked' : ''}> No aceptar más horas de las que pasaron desde el último registro</label>`, 'reg',
-      'Sirve para detectar errores de tipeo. Aplica en la app y en WhatsApp.')}
+      'Evita errores de tipeo.')}
     ${tarjeta('Mantención', auto, `
       <label class="regla">Hacer mantención cada ${n('intervaloMant', 'horas de motor', 'min="1"')}</label>
       <label class="regla">🟡 Avisar cuando falten ${n('horasMantAviso', 'horas')}</label>
-      <label class="regla">🔴 Avisar urgente cuando falten ${n('horasMantUrgente', 'horas')}</label>`, 'mant', 'Se repite: después de cada mantención empieza la cuenta para la siguiente.')}
+      <label class="regla">🔴 Avisar urgente cuando falten ${n('horasMantUrgente', 'horas')}</label>`, 'mant', 'Se repite después de cada mantención.')}
     ${tarjeta('Horómetro: límite total de horas', auto, `
       <label class="regla">🟡 Avisar cuando llegue al ${n('pctAviso', '% del límite', 'max="100"')}</label>
-      <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>`, 'lim', 'No se repite. El límite de cada camión está en su ficha (Flota → camión → Editar datos).')}
+      <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>`, 'lim', 'Una sola vez. El límite se edita en la ficha del camión.')}
     ${tarjeta('Revisión técnica', auto, `
       <label class="regla">🟡 Avisar ${n('diasPorVencer', 'días antes del vencimiento')}</label>
-      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>`, 'rt', 'Se revisa sola todos los días a las 9:00.')}
+      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>`, 'rt', 'Se revisa todos los días a las 9:00.')}
     ${tarjeta('Contratos de arriendo', app, `
       <label class="regla">🟡 Avisar para renegociar ${n('diasContratoAviso', 'días antes del término')}</label>
       <label class="regla">🔴 Urgente ${n('diasContratoUrgente', 'días antes')}</label>`, 'con')}
@@ -1585,32 +1585,24 @@ function ajustesAlertas(cfg) {
 // Ejemplos con los números que el dueño está escribiendo (se actualizan mientras escribe)
 function pintarEjemplos(c) {
   const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = '<span class="t">Ejemplo</span>' + html; };
-  pon('reg', `Ayer a las 18:00 el camión marcaba <b>7.450 h</b>.<br>
-    Hoy a las 8:00 (pasaron <b>14 horas</b>) el empleado quiere enviar <b>7.454</b>, pero se equivoca y escribe <b>7.540</b>.<br><br>
-    <b>Con la regla activada:</b> ❌ se rechaza, porque en 14 horas el motor no pudo trabajar 90 horas. El empleado revisa y lo corrige.<br>
-    <b>Con la regla apagada:</b> ⚠️ se guarda 7.540 y la próxima mantención se calcula mal.<br><br>
-    Ahora está: <b>${c.validarSalto ? 'ACTIVADA ✅' : 'APAGADA'}</b>`);
-  const iv = c.intervaloMant || 250, base = 7250, prox = base + iv;
-  pon('mant', `La última mantención fue a las <b>${n0(base)} h</b>, así que la próxima es a las <b>${n0(prox)} h</b>.<br>
-    🟡 Al llegar a <b>${n0(prox - c.horasMantAviso)} h</b> te llega: "faltan ${n0(c.horasMantAviso)} h para la mantención".<br>
-    🔴 A las <b>${n0(prox - c.horasMantUrgente)} h</b>: "urgente, faltan ${n0(c.horasMantUrgente)} h".<br>
-    Cuando registras la mantención, la cuenta vuelve a partir: la siguiente es a las <b>${n0(prox + iv)} h</b>.`);
-  const lim = 12000;
-  pon('lim', `El camión no debería pasar de <b>${n0(lim)} h</b> en total (por vida útil, garantía o contrato).<br>
-    🟡 Al llegar a <b>${n0(lim * c.pctAviso / 100)} h</b> (${n0(c.pctAviso)}%) te llega un aviso.<br>
-    🔴 A las <b>${n0(lim * c.pctUrgente / 100)} h</b> (${n0(c.pctUrgente)}%), el aviso urgente.<br>
-    Es como el kilometraje total de un auto: pasa una sola vez. La mantención es como el cambio de aceite: se repite.`);
-  const vence = new Date(hoy0().getTime() + 45 * DIA);
-  pon('rt', `La revisión técnica vence el <b>${fecha(vence)}</b>.<br>
-    🟡 El <b>${fecha(vence.getTime() - c.diasPorVencer * DIA)}</b> (${n0(c.diasPorVencer)} días antes) te llega un aviso por WhatsApp.<br>
-    🔴 El <b>${fecha(vence.getTime() - c.diasUrgente * DIA)}</b> (${n0(c.diasUrgente)} días antes), el aviso urgente.<br>
-    Si se vence, te llega "vencida". Cuando cambias la fecha en la ficha del camión, la cuenta parte de nuevo.`);
-  const termino = new Date(hoy0().getTime() + 90 * DIA);
-  pon('con', `El contrato termina el <b>${fecha(termino)}</b>.<br>
-    🟡 Desde el <b>${fecha(termino.getTime() - c.diasContratoAviso * DIA)}</b> aparece en la app para renegociar.<br>
-    🔴 Desde el <b>${fecha(termino.getTime() - c.diasContratoUrgente * DIA)}</b>, como urgente.`);
-  pon('sr', `Un camión arrendado registró el horómetro el lunes.<br>
-    Si pasan <b>${n0(c.diasSinReporte)} días</b> sin un registro nuevo, aparece en la app como "sin reporte", para que le preguntes al empleado.`);
+  const dia = d => fecha(hoy0().getTime() + d * DIA);
+  pon('reg', `Hace 2 h marcaba <b>7.450</b> y llega <b>7.540</b>:<br>
+    ${c.validarSalto ? '❌ Se rechaza: no pudo sumar 90 h en 2 h.' : '⚠️ Se acepta igual (regla apagada).'}`);
+  const prox = 7250 + (c.intervaloMant || 250);
+  pon('mant', `Próxima mantención: <b>${n0(prox)} h</b><br>
+    🟡 Aviso a las <b>${n0(prox - c.horasMantAviso)} h</b><br>
+    🔴 Urgente a las <b>${n0(prox - c.horasMantUrgente)} h</b>`);
+  pon('lim', `Límite del camión: <b>12.000 h</b><br>
+    🟡 Aviso a las <b>${n0(12000 * c.pctAviso / 100)} h</b><br>
+    🔴 Urgente a las <b>${n0(12000 * c.pctUrgente / 100)} h</b>`);
+  pon('rt', `Vence el <b>${dia(45)}</b><br>
+    🟡 Aviso el <b>${dia(45 - c.diasPorVencer)}</b><br>
+    🔴 Urgente el <b>${dia(45 - c.diasUrgente)}</b>`);
+  pon('con', `Termina el <b>${dia(90)}</b><br>
+    🟡 Aviso el <b>${dia(90 - c.diasContratoAviso)}</b><br>
+    🔴 Urgente el <b>${dia(90 - c.diasContratoUrgente)}</b>`);
+  pon('sr', `Último registro: <b>${dia(0)}</b><br>
+    Sin registros hasta el <b>${dia(c.diasSinReporte + 1)}</b> → aparece como "sin reporte".`);
 }
 function guardarAlertas(ev) {
   ev.preventDefault();
