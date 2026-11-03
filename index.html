@@ -168,6 +168,17 @@ a.kpi{cursor:pointer}
 .barra{height:8px;background:#E2E8F0}
 .barra > span{display:block;height:100%;background:#64748B}
 .barra.urgente > span,.barra.vencido > span{background:#B91C1C}
+.barra.porvencer > span{background:#C2410C}
+/* Inicio: estado general arriba y bloques de mantenciones, vencimientos y registros */
+.estado-hero{display:flex;flex-direction:column;gap:10px}
+.estado-hero .chip-ico{width:48px;height:48px;border-radius:14px}
+.estado-hero .chip-ico .ico{width:26px;height:26px}
+.estado-hero .grande{font-family:Lexend;font-weight:700;font-size:1.45rem;line-height:1.2;display:block}
+.fila-inicio{display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--borde);color:inherit;text-decoration:none}
+.fila-inicio:first-of-type{border-top:0}
+.fila-inicio .cuerpo{flex:1;min-width:0}
+.fila-inicio .barra{display:block;margin:.35rem 0 .2rem}
+.fila-inicio .fila.entre{display:flex}
 
 /* Formularios */
 label.campo{display:block;font-weight:600;margin-bottom:12px}
@@ -373,7 +384,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 30</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 31</div>
   <main id="app"></main>
   <nav class="tabbar no-print" id="tabbar" aria-label="Navegación principal"></nav>
 </div>
@@ -959,43 +970,54 @@ function reiniciar() { if (confirm('¿Volver a los datos de ejemplo originales? 
 
 /* ============ Dueño: Inicio ============ */
 VISTAS.inicio = () => {
-  const cs = S.camiones, arr = cs.filter(c => c.contratoId).length, disp = cs.length - arr;
-  const items = itemsAtencion();
-  const ks = S.contratos.slice().sort((a, b) => a.termino.localeCompare(b.termino));
-  const ocup = cs.length ? Math.round(arr / cs.length * 100) : 0;
+  const cs = S.camiones, items = itemsAtencion();
+  // 1) Estado general: cuántos pendientes y de qué tipo
+  const tipos = [['Mantención', 'mantención'], ['Revisión técnica', 'revisión técnica'], ['Contrato', 'contrato'], ['Horómetro', 'límite de horas'], ['Sin reporte', 'sin reporte']]
+    .map(([t, nombre]) => [items.filter(x => x.tipo === t).length, nombre]).filter(([n]) => n);
+  const peor = items.length ? items[0].e : 'ok';
+  // 2) Próximas mantenciones: las que tienen menos horas por delante
+  const mants = cs.map(c => ({ c, m: estadoMant(c) })).sort((x, y) => x.m.resta - y.m.resta).slice(0, 5);
+  // 3) Próximos vencimientos (90 días): revisiones técnicas y contratos
+  const venc = [
+    ...cs.map(c => ({ que: 'Revisión técnica', nombre: fmtPatente(c.patente), f: dISO(c.rtVence), e: estadoRT(c).e, href: '#camion/' + c.id })),
+    ...S.contratos.map(k => ({ que: 'Contrato', nombre: k.empresa, f: dISO(k.termino), e: estadoContrato(k).e, href: '#contrato/' + k.id })),
+  ].map(v => ({ ...v, d: diasHasta(v.f) })).filter(v => v.d <= 90).sort((x, y) => x.d - y.d).slice(0, 5);
+  // 4) Últimos registros del horómetro (WhatsApp o app)
+  const regs = cs.flatMap(c => lecturasOk(c).map(l => ({ c, l }))).sort((x, y) => y.l.fecha - x.l.fecha).slice(0, 5);
+  const dias = d => d < 0 ? `venció hace ${-d} ${d === -1 ? 'día' : 'días'}` : d === 0 ? 'vence hoy' : `en ${d} ${d === 1 ? 'día' : 'días'}`;
   return `
-  <div class="fecha-larga">${fechaLarga()}</div>
-  <h1>${saludo()}${REAL && SESION && SESION.nombre ? ', ' + esc(SESION.nombre.split(' ')[0]) : ''}</h1>
-  <p class="no-movil">Tienes <b>${nCam(cs.length)}</b>: ${arr} ${arr === 1 ? 'arrendado' : 'arrendados'} y ${disp} ${disp === 1 ? 'disponible' : 'disponibles'}. ${items.length ? `Hay <b>${items.length === 1 ? '1 tema' : items.length + ' temas'} por revisar</b>.` : 'Todo está al día.'}</p>
-  <div class="kpis">
-    ${kpi('marca', cs.length, 'Flota total', 'truck', '#flota')}
-    ${kpi('', arr, 'Arrendados', 'building', '#flota?f=arrendados')}
-    ${kpi('', disp, 'Disponibles', 'check', '#flota?f=disponibles')}
-    ${kpi(items.length ? 'urgente' : 'ok', items.length, 'Por revisar', items.length ? 'alert' : 'check', '#avisos')}
-  </div>
-  <div class="solo-cel">
-    <div class="titulo-seccion"><h2>Tu flota</h2><a href="#flota">Ver todos →</a></div>
-    <div class="grilla-camiones">${cs.slice().sort(ordenUrgencia).slice(0, 4).map(tarjetaCamion).join('')}</div>
-  </div>
-  <div class="grid-inicio">
-    <section class="tarjeta">
-      <div class="titulo-tarjeta"><h2>Requiere atención</h2>${items.length ? `<span class="chip urgente">${items.length} por revisar</span>` : ''}</div>
-      <p class="sec no-movil">Ordenado del más urgente al menos urgente.</p>
-      <div>${items.length ? items.map(filaAtencion).join('') : '<div class="vacio">Nada pendiente. Todo al día.</div>'}</div>
-    </section>
-    <div>
-      <section class="tarjeta">
-        <div class="titulo-tarjeta"><h2>Contratos</h2><a class="ver-todo" href="#contratos">Ver todos →</a></div>
-        ${ks.length ? ks.map(k => { const ec = estadoContrato(k); return `<a class="aviso-fila" href="#contrato/${k.id}"><span class="cuerpo"><b>${esc(k.empresa)}</b><span class="sec">${nCam(camionesDe(k).length)} · hasta ${fecha(dISO(k.termino))}</span><span style="margin-top:2px">${estado(ec.e, ec.txt)}</span></span>${ic('chevron')}</a>`; }).join('') : '<p class="sec">Sin contratos activos.</p>'}
-      </section>
-      <section class="tarjeta">
-        <h2>Ocupación de la flota</h2>
-        <p style="margin:0"><b class="num" style="font-size:1.6rem">${ocup}%</b> <span class="sec">arrendada</span></p>
-        <div class="barra marca" role="img" aria-label="${ocup}% de la flota arrendada"><span style="width:${ocup}%"></span></div>
-        <p class="sec" style="margin:0">${arr} arrendados · ${disp} disponibles para arriendo</p>
-      </section>
+  <h1 style="margin-bottom:12px">Resumen</h1>
+  <section class="tarjeta estado-hero">
+    <div class="fila" style="gap:12px">
+      <span class="chip-ico ${peor}">${ic(items.length ? 'alert' : 'check')}</span>
+      <span><span class="sec">${fechaLarga()} · ${nCam(cs.length)}</span><span class="grande">${items.length ? `${items.length} ${items.length === 1 ? 'pendiente' : 'pendientes'}` : 'Todo al día'}</span></span>
     </div>
-  </div>`;
+    ${tipos.length ? `<div class="chips" style="margin:0">${tipos.map(([n, nombre]) => `<span class="chip">${n} ${nombre}</span>`).join('')}</div>
+      <a class="btn chico" href="#avisos" style="align-self:flex-start">Ver pendientes</a>` : ''}
+  </section>
+  <div class="grid grid-2">
+    <section class="tarjeta">
+      <div class="titulo-tarjeta"><h2>Próximas mantenciones</h2><a class="ver-todo" href="#horometros">Ver todo →</a></div>
+      ${mants.length ? mants.map(({ c, m }) => `<a class="fila-inicio" href="#camion/${c.id}"><span class="cuerpo">
+        <span class="fila entre"><b>${fmtPatente(c.patente)}</b>${estado(m.e, m.resta > 0 ? `faltan ${n0(m.resta)} h` : `atrasada ${n0(-m.resta)} h`)}</span>
+        <span class="barra ${m.e}" role="img" aria-label="${Math.round(Math.min(100, Math.max(0, (1 - m.resta / S.config.intervaloMant) * 100)))}% del camino a la próxima mantención"><span style="width:${Math.min(100, Math.max(0, (1 - m.resta / S.config.intervaloMant) * 100))}%"></span></span>
+        <span class="sub">Próxima a las ${n0(m.prox)} h${m.fechaProx ? ' · aprox. el ' + fecha(m.fechaProx) : ''}</span></span>${ic('chevron')}</a>`).join('')
+        : `<p class="sec">Aún no hay camiones.</p><a class="btn chico cta" href="#editar/nuevo">${ic('plus')}Agregar camión</a>`}
+    </section>
+    <section class="tarjeta">
+      <div class="titulo-tarjeta"><h2>Próximos vencimientos</h2></div>
+      ${venc.length ? venc.map(v => `<a class="fila-inicio" href="${v.href}"><span class="cuerpo"><b>${esc(v.nombre)}</b>
+        <span class="sub">${v.que} · ${fecha(v.f)}</span></span>${estado(v.e, dias(v.d))}${ic('chevron')}</a>`).join('')
+        : '<p class="sec" style="margin:0">Nada vence en los próximos 90 días.</p>'}
+    </section>
+  </div>
+  <section class="tarjeta">
+    <div class="titulo-tarjeta"><h2>Últimos registros</h2><a class="ver-todo" href="#horometros">Ver todo →</a></div>
+    ${regs.length ? regs.map(({ c, l }) => `<a class="fila-inicio" href="#camion/${c.id}"><span class="chip-ico">${ic(l.origen === 'whatsapp' ? 'send' : 'gauge')}</span>
+      <span class="cuerpo"><b>${fmtPatente(c.patente)} · <span class="num">${n1(l.valor)} h</span></b>
+      <span class="sub">${cuando(l.fecha)} · ${l.origen === 'whatsapp' ? 'por WhatsApp' : l.origen === 'ejemplo' ? 'historial' : 'en la app'} · ${esc(l.quien || usuario(l.usuario).nombre)}</span></span>${ic('chevron')}</a>`).join('')
+      : '<p class="sec" style="margin:0">Todavía no hay registros del horómetro.</p>'}
+  </section>`;
 };
 
 /* ============ Dueño: Flota ============ */
