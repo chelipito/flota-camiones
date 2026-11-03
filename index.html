@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 10</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 11</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -422,15 +422,16 @@ const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave púb
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
+// la clave nueva (sb_publishable_) va solo en apikey; la antigua (eyJ...) también en Authorization
+const supaHeaders = () => ({ apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) });
 let FIRMA = '', ULTIMO_ID = null;
 async function traerLecturas() {
   try {
-    // la clave nueva (sb_publishable_) va solo en apikey; la antigua (eyJ...) también en Authorization
-    const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: { apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) } });
+    const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: supaHeaders() });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const filas = await res.json();
     // Con un solo camión, la patente y el límite mandan desde Supabase: se cambian en un solo lugar (supabase/cambiar-camion.sql)
-    const rc = await fetch(`${SUPA_URL}/rest/v1/camiones?select=patente,limite`, { headers: { apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) } });
+    const rc = await fetch(`${SUPA_URL}/rest/v1/camiones?select=patente,limite`, { headers: supaHeaders() });
     const cams = rc.ok ? await rc.json() : [];
     let cambioCamion = false;
     if (cams.length === 1 && S.camiones.length === 1) {
@@ -442,7 +443,7 @@ async function traerLecturas() {
     if (firma === FIRMA && !cambioCamion) return;
     FIRMA = firma;
     const ult = filas.length ? filas.reduce((a, b) => (a.id > b.id ? a : b)) : null;
-    if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID) toast(`Llegó por WhatsApp: ${fmtPatente(ult.patente)} · ${n1(ult.valor)} h`);
+    if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID && ult.origen === 'whatsapp') toast(`Llegó por WhatsApp: ${fmtPatente(ult.patente)} · ${n1(ult.valor)} h`);
     if (ult) ULTIMO_ID = ult.id;
     S.camiones.forEach(c => {
       const ls = filas.filter(f => f.patente === c.patente);
@@ -1235,26 +1236,40 @@ VISTAS.editar = id => {
   return `
   <h1>${nuevo ? 'Agregar camión' : 'Editar ' + fmtPatente(c.patente)}</h1>
   <form class="tarjeta" onsubmit="guardarCamion(event,'${id}')">
-    <label class="campo">Patente<input name="patente" required value="${esc(c.patente)}" autocapitalize="characters"></label>
+    <label class="campo">Patente<input name="patente" required value="${esc(c.patente)}" autocapitalize="characters" ${REAL && !nuevo ? 'readonly' : ''}></label>
     <label class="campo">Tipo de equipo<input name="tipo" required value="${esc(c.tipo)}" placeholder="Camión tolva, aljibe…"></label>
     <label class="campo">Marca y modelo<input name="modelo" value="${esc(c.modelo)}"></label>
     <label class="campo" hidden>Empleado que registra el horómetro<select name="operador"><option value="">— Nadie —</option>${emps.map(o => `<option value="${o.id}" ${o.id === c.operador ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></label>
-    <label class="campo">Límite de horas de motor<input name="limite" type="number" min="1" required value="${c.limite}" inputmode="numeric"></label>
+    <label class="campo">Límite de horas de motor<input name="limite" type="number" min="1" required value="${c.limite}" inputmode="numeric" ${REAL && !nuevo ? 'readonly' : ''}></label>
+    ${REAL && !nuevo ? '<p class="ayuda" style="margin-top:-.5rem">La patente y el límite están conectados con WhatsApp y no se cambian aquí.</p>' : ''}
     <label class="campo">Vencimiento de la revisión técnica<input name="rtVence" type="date" required value="${c.rtVence}"></label>
-    ${nuevo ? '<label class="campo">Lectura actual del horómetro<input name="inicial" type="number" min="0" step="0.1" required inputmode="decimal"></label>' : ''}
+    ${nuevo ? `<label class="campo">Lectura actual del horómetro<input name="inicial" type="number" min="0.1" step="0.1" required inputmode="decimal"></label>
+    <label class="campo">¿Qué día se leyó? <span class="ayuda">(desde ahí se cuentan las horas para el próximo registro)</span><input name="fechaLectura" type="date" required max="${isoLocal(Date.now())}" value="${isoLocal(Date.now())}"></label>
+    ${REAL ? '<p class="ayuda">Al guardar, el camión queda listo para registrar su horómetro por WhatsApp con su patente y el número.</p>' : ''}` : ''}
     <div class="acciones"><button class="btn pri" style="flex:1">Guardar</button>${nuevo ? '' : `<button type="button" class="btn peligro" onclick="quitarCamion('${id}')">Quitar de la flota</button>`}</div>
   </form>`;
 };
-function guardarCamion(ev, id) {
+async function guardarCamion(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target));
   d.patente = d.patente.toUpperCase().replace(/[^A-Z0-9]/g, ''); d.limite = Number(d.limite);
   if (S.camiones.some(c => c.patente === d.patente && c.id !== id)) { toast('Ya existe un camión con esa patente'); return; }
   const datos = { patente: d.patente, tipo: d.tipo.trim(), modelo: d.modelo.trim(), operador: d.operador, limite: d.limite, rtVence: d.rtVence };
   if (id === 'nuevo') {
+    // lectura de hoy = ahora; de un día anterior = ese día a las 18:00
+    const fechaL = d.fechaLectura === isoLocal(Date.now()) ? Date.now() : new Date(d.fechaLectura + 'T18:00').getTime();
+    if (REAL) {
+      const btn = ev.target.querySelector('button.pri'); btn.disabled = true; btn.textContent = 'Guardando…';
+      try {
+        const res = await fetch(`${SUPA_URL}/rest/v1/rpc/agregar_camion`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ p_patente: d.patente, p_limite: d.limite, p_horometro: Number(d.inicial), p_fecha: new Date(fechaL).toISOString() }) });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
+      } catch (e) { toast('No se pudo agregar: ' + e.message); btn.disabled = false; btn.textContent = 'Guardar'; return; }
+    }
     const c = { id: 'c' + Date.now(), contratoId: null, ...datos,
-      lecturas: [{ id: 'l' + Date.now(), fecha: Date.now(), valor: Number(d.inicial), usuario: 'u0', foto: false, estado: 'validado', sync: 'enviado' }] };
-    S.camiones.push(c); guardar(); toast('Camión agregado'); ir('camion/' + c.id);
+      lecturas: [{ id: 'l' + Date.now(), fecha: fechaL, valor: Number(d.inicial), usuario: 'u0', quien: 'Lectura inicial', foto: false, estado: 'validado', sync: 'enviado' }] };
+    S.camiones.push(c); guardar(); toast(REAL ? `Camión agregado. Ya puede registrar por WhatsApp: ${c.patente} y el número` : 'Camión agregado'); ir('camion/' + c.id);
+    if (REAL) { FIRMA = ''; traerLecturas(); }
   } else { Object.assign(camion(id), datos); guardar(); toast('Cambios guardados'); ir('camion/' + id); }
 }
 function quitarCamion(id) {
