@@ -3,6 +3,7 @@
 // revisión técnica pasan a "por vencer", "urgente" o "atrasado/vencida". Cada aviso se manda una sola vez.
 // La llaman: la función "whatsapp" al recibir un registro, la app (registros, cambios y "Revisar ahora")
 // y una tarea programada de Supabase todos los días a las 9:00 (supabase/avisos-diarios.sql).
+// Configuración → Alertas → "Cómo te llegan los avisos": aviso al momento (sí/no) y resumen (nunca, diario o semanal).
 // Usa los mismos secretos que la función "whatsapp" (WHATSAPP_TOKEN y WHATSAPP_PHONE_ID).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -75,6 +76,9 @@ function revisar(cam: any, ls: { valor: number; fecha: number }[], ficha: any, c
   const resumen = resta > 0 ? `Faltan ${n0(resta)} h para la mantención de las ${n0(prox)} h${cuando}.` : `⚠️ Mantención atrasada ${n0(-resta)} h (tocaba a las ${n0(prox)} h).`;
   return { avisos, resumen };
 }
+// "🟡 Por vencer · Mantención\nHKTZ48: faltan…" → "🟡 HKTZ48: faltan…" (para el resumen)
+const lineaCorta = (texto: string) => `${texto.split(' ')[0]} ${texto.split('\n')[1] ?? ''}`;
+const DIAS_SEMANA = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
@@ -103,13 +107,20 @@ Deno.serve(async (req) => {
   if (patente) q = q.eq('patente', patente);
   const { data: camiones } = await q;
   let enviados = 0, resumen = '';
+  const pendientes: string[] = [];
   for (const cam of camiones ?? []) {
     const { data: filas } = await db.from('lecturas').select('valor, fecha').eq('patente', cam.patente).order('fecha', { ascending: true });
     const ls = (filas ?? []).map((f) => ({ valor: Number(f.valor), fecha: Date.parse(f.fecha) }));
     const ficha = (datos.camiones ?? []).find((c: any) => c.patente === cam.patente);
     const r = revisar(cam, ls, ficha, cfg);
     if (patente) resumen = r.resumen;
-    if (!destinos.length) continue;
+    pendientes.push(...r.avisos.map((a) => lineaCorta(a.texto)));
+    // Sin reporte: camión arrendado sin registros hace más de X días
+    if (ficha?.contratoId && ls.length) {
+      const sin = Math.floor((Date.now() - ls[ls.length - 1].fecha) / DIA);
+      if (sin > (cfg.diasSinReporte ?? 2)) pendientes.push(`⚪ ${cam.patente}: ${sin} días sin registrar el horómetro.`);
+    }
+    if (!destinos.length || cfg.avisoInmediato === false) continue; // aviso al momento apagado en Configuración
     for (const a of r.avisos) {
       // Se anota antes de enviar: si dos registros llegan juntos, el aviso igual sale una sola vez
       const { error } = await db.from('avisos_enviados').insert({ clave: a.clave, detalle: a.texto });
@@ -117,6 +128,24 @@ Deno.serve(async (req) => {
       const rs = await Promise.all(destinos.map((d) => enviarWsp(d, a.texto)));
       if (rs.some((x) => x.ok)) enviados++;
       else await db.from('avisos_enviados').delete().eq('clave', a.clave); // no salió: se reintenta en el próximo registro
+    }
+  }
+
+  // Resumen programado (solo en la revisión diaria de las 9:00): todos los días o una vez por semana
+  const hoySemana = DIAS_SEMANA.indexOf(new Date().toLocaleDateString('en-US', { weekday: 'short', timeZone: 'America/Santiago' }));
+  const tocaResumen = cfg.resumenFrec === 'diario' || (cfg.resumenFrec === 'semanal' && Number(cfg.resumenDia ?? 1) === hoySemana);
+  if (!conSesion && !patente && tocaResumen && destinos.length) {
+    (datos.contratos ?? []).forEach((k: any) => {
+      const d = k.termino ? diasHasta(k.termino) : 999;
+      if (d <= (cfg.diasContratoAviso ?? 60)) pendientes.push(`${d <= (cfg.diasContratoUrgente ?? 15) ? '🔴' : '🟡'} Contrato ${k.empresa}: ${d < 0 ? 'terminó' : `termina en ${d} ${d === 1 ? 'día' : 'días'}`}.`);
+    });
+    const clave = `resumen|${hoyChile()}`;
+    const texto = `📋 Resumen ${cfg.empresa ?? 'Control de Flota'} · ${fecha(Date.now())}\n` +
+      (pendientes.length ? `${pendientes.length} ${pendientes.length === 1 ? 'pendiente' : 'pendientes'}:\n${pendientes.join('\n')}` : '✅ Todo al día.');
+    const { error } = await db.from('avisos_enviados').insert({ clave, detalle: texto });
+    if (!error) {
+      const rs = await Promise.all(destinos.map((d) => enviarWsp(d, texto)));
+      if (rs.some((x) => x.ok)) enviados++; else await db.from('avisos_enviados').delete().eq('clave', clave);
     }
   }
   return json(conSesion ? { resumen, enviados, sinDestino: !destinos.length } : { enviados });
