@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 15</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 16</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -901,12 +901,13 @@ VISTAS.camion = id => {
       <div class="barra ${h.e}" role="img" aria-label="${Math.floor(h.pct)}% del límite usado"><span style="width:${Math.min(100, h.pct)}%"></span></div>
       <div class="chips" style="margin-bottom:.5rem">${chip(h.e, h.txt)}</div>
       <p class="sec" style="margin:0 0 .75rem">${h.pct >= 100 ? 'Ya superó el límite.' : h.dias != null ? `Usa en promedio <b>${n1(h.prom)} h por día</b>. Le quedan <b>${n0(h.resta)} h</b>: llegaría al límite cerca del <b>${fecha(h.fechaLim)}</b>.` : `Le quedan <b>${n0(h.resta)} h</b>. Sin uso reciente para proyectar.`}</p>
-      ${REAL ? `<p class="sec" style="margin:0">Para registrar, manda por WhatsApp${WSP_NUMERO ? ' al <b>' + esc(WSP_NUMERO) + '</b>' : ''} el número del horómetro (por ejemplo, <b>${n0(Math.floor(h.actual) + 8)}</b>).</p>` : `<form class="no-print" onsubmit="registrarDueno(event,'${c.id}')">
+      <form class="no-print" onsubmit="registrarDueno(event,'${c.id}')">
         <label class="campo" style="margin-bottom:.5rem">Nueva lectura del horómetro
           <input name="lectura" inputmode="decimal" autocomplete="off" placeholder="Ej.: ${n0(Math.floor(h.actual) + 8)}" aria-describedby="ayudaH${c.id}"></label>
         <p id="ayudaH${c.id}" class="ayuda" style="margin:0 0 .5rem">Debe ser igual o mayor que ${n1(h.actual)} h.</p>
         <button class="btn chico cta">${ic('gauge')}Registrar horómetro</button>
-      </form>`}
+      </form>
+      ${REAL ? `<p class="ayuda" style="margin:.5rem 0 0">También por WhatsApp${WSP_NUMERO ? ' al ' + esc(WSP_NUMERO) : ''}: <b>${esc(c.patente)} ${n0(Math.floor(h.actual))}</b></p>` : ''}
     </section>
   </div>
   ${(() => { const m = estadoMant(c); return `<section class="tarjeta borde-${m.e}">
@@ -962,12 +963,22 @@ function validar(cid, lid, ok) {
 }
 
 // El dueño registra la lectura desde la ficha del camión; queda validada porque la anota él mismo
-function registrarDueno(ev, id) {
+async function registrarDueno(ev, id) {
   ev.preventDefault();
   const c = camion(id), txt = ev.target.lectura.value;
   const v = leerNumero(txt);
   const error = txt.trim() ? validarLectura(c, v) : 'Escribe el número del horómetro, solo con números.';
   if (error) { toast(error); ev.target.lectura.focus(); return; }
+  if (REAL) {
+    const btn = ev.target.querySelector('button'); btn.disabled = true;
+    try {
+      if (!(await sesionVigente())) return sesionPerdida();
+      const res = await fetch(`${SUPA_URL}/rest/v1/rpc/registrar_lectura`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_patente: c.patente, p_valor: v }) });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
+      toast(`Horómetro registrado: ${n1(v)} h`); FIRMA = ''; await traerLecturas();
+    } catch (e) { toast('No se pudo registrar: ' + e.message); btn.disabled = false; }
+    return;
+  }
   c.lecturas.push({ id: 'l' + Date.now(), fecha: Date.now(), valor: v, usuario: 'u0', foto: false, img: null, estado: 'validado', sync: 'enviado' });
   guardar(); toast(`Horómetro registrado: ${n1(v)} h`); render();
 }
