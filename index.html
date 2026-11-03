@@ -276,13 +276,13 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
   <header class="top">
     <button class="btn-ico btn-menu" id="btnMenu" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="side" onclick="abrirMenu()" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-menu"/></svg></button>
     <button id="btnVolver" class="volver" type="button" onclick="volverAtras()" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg>Volver</button>
-    <a class="marca" id="marca" href="#perfil"><svg class="ico logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg><span class="marca-txt">Control de Flota</span></a>
+    <a class="marca" id="marca" href="#inicio"><svg class="ico logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg><span class="marca-txt">Control de Flota</span></a>
     <div class="migas" id="migas"></div>
     <span id="estadoRed" class="pill"></span>
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda">Demostración · datos de ejemplo · versión 8</div>
+  <div class="demo-banda">Demostración · datos de ejemplo · versión 9</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -421,7 +421,7 @@ function crearDemo() {
 let S;
 try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
-if (!S.rol) S.rol = 'dueno'; // la app abre directo en la vista del dueño
+S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ } }
 
@@ -527,13 +527,14 @@ addEventListener('offline', () => { pintarRed(); render(); });
 const MENU = [
   ['inicio', 'home', 'Inicio'], ['flota', 'truck', 'Flota'], ['contratos', 'file', 'Contratos'],
   ['revisiones', 'shield', 'Revisiones técnicas'], ['horometros', 'gauge', 'Horómetros'],
-  ['avisos', 'bell', 'Avisos'], ['usuarios', 'users', 'Usuarios y accesos']
-];
+  ['avisos', 'bell', 'Avisos']
+]; // 'Usuarios y accesos' queda escondido mientras solo entre el dueño
 const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
 const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
-function permitido(rol, r) { return rol === 'dueno' ? !['empleado', 'registrar', 'cliente'].includes(r) : PERMISOS[rol].includes(r); }
+const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'wsp', 'usuarios', 'editar-usuario']; // vistas guardadas para más adelante
+function permitido(rol, r) { return rol === 'dueno' ? !ESCONDIDAS.includes(r) : PERMISOS[rol].includes(r); }
 function leerRuta() {
   const [path, qs = ''] = location.hash.slice(1).split('?');
   const [r, arg] = path.split('/');
@@ -564,7 +565,6 @@ function pintarMenu(r) {
     ${MENU.map(item).join('')}
     <div class="abajo">
       ${item(['ajustes', 'sliders', 'Configuración'])}
-      <a class="item-menu" href="#perfil" ${r === 'perfil' ? 'aria-current="page"' : ''}>${ic('repeat')}<span>Ver como empleado o cliente</span></a>
     </div>`;
   const n = avisos;
   const camp = $('#campana');
@@ -581,7 +581,7 @@ const VISTAS = {};
 function render() {
   let { r, arg, q } = leerRuta();
   if (!r) r = HOME[S.rol];
-  else if (r !== 'perfil' && (!VISTAS[r] || !permitido(S.rol, r))) r = HOME[S.rol];
+  else if (!VISTAS[r] || !permitido(S.rol, r)) r = HOME[S.rol];
   const conSide = S.rol === 'dueno';
   document.body.classList.toggle('con-side', conSide);
   const app = $('#app');
@@ -728,7 +728,7 @@ VISTAS.camion = id => {
   const max = Math.max(12, ...dias.map(x => x.h));
   const ec = k && estadoContrato(k);
   return `
-  <div class="cab"><div><h1 class="patente">${fmtPatente(c.patente)}</h1><p class="sec" style="margin:0">${esc(c.tipo)} · ${esc(c.modelo)}${c.operador ? ' · Registra: ' + esc(usuario(c.operador).nombre) : ''}</p></div>
+  <div class="cab"><div><h1 class="patente">${fmtPatente(c.patente)}</h1><p class="sec" style="margin:0">${esc(c.tipo)} · ${esc(c.modelo)}</p></div>
     <div class="chips">${chipArriendo(c)}${chip(estadoGeneral(c), ETQ[estadoGeneral(c)])}</div></div>
   ${k ? `<section class="tarjeta borde-${ec.e}">
       <div class="titulo-tarjeta"><h2>Arrendado a ${esc(k.empresa)}</h2>${chip(ec.e, ec.txt)}</div>
@@ -751,7 +751,13 @@ VISTAS.camion = id => {
       <p style="margin:0"><b class="num" style="font-size:1.5rem">${n1(h.actual)} h</b> <span class="sec">de ${n0(c.limite)} h de límite</span></p>
       <div class="barra ${h.e}" role="img" aria-label="${Math.floor(h.pct)}% del límite usado"><span style="width:${Math.min(100, h.pct)}%"></span></div>
       <div class="chips" style="margin-bottom:.5rem">${chip(h.e, h.txt)}</div>
-      <p class="sec" style="margin:0">${h.pct >= 100 ? 'Ya superó el límite.' : h.dias != null ? `Usa en promedio <b>${n1(h.prom)} h por día</b>. Le quedan <b>${n0(h.resta)} h</b>: llegaría al límite cerca del <b>${fecha(h.fechaLim)}</b>.` : `Le quedan <b>${n0(h.resta)} h</b>. Sin uso reciente para proyectar.`}</p>
+      <p class="sec" style="margin:0 0 .75rem">${h.pct >= 100 ? 'Ya superó el límite.' : h.dias != null ? `Usa en promedio <b>${n1(h.prom)} h por día</b>. Le quedan <b>${n0(h.resta)} h</b>: llegaría al límite cerca del <b>${fecha(h.fechaLim)}</b>.` : `Le quedan <b>${n0(h.resta)} h</b>. Sin uso reciente para proyectar.`}</p>
+      <form class="no-print" onsubmit="registrarDueno(event,'${c.id}')">
+        <label class="campo" style="margin-bottom:.5rem">Nueva lectura del horómetro
+          <input name="lectura" inputmode="decimal" autocomplete="off" placeholder="Ej.: ${n0(Math.floor(h.actual) + 8)}" aria-describedby="ayudaH${c.id}"></label>
+        <p id="ayudaH${c.id}" class="ayuda" style="margin:0 0 .5rem">Debe ser igual o mayor que ${n1(h.actual)} h.</p>
+        <button class="btn chico cta">${ic('gauge')}Registrar horómetro</button>
+      </form>
     </section>
   </div>
   ${k ? `<section class="tarjeta">
@@ -771,7 +777,7 @@ VISTAS.camion = id => {
       <tbody>${ls.slice(-10).reverse().map(l => `<tr>
         <td>${fechaCorta(l.fecha)} ${hora(l.fecha)}<br><span class="sec">${esc(usuario(l.usuario).nombre)}${l.origen === 'whatsapp' ? ' · WhatsApp' : ''}</span></td>
         <td class="num">${n1(l.valor)}</td>
-        <td><img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)}"></td>
+        <td>${l.foto === false ? '<span class="sec">—</span>' : `<img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)}">`}</td>
         <td>${celdaEstado(l, c.id)}</td></tr>`).join('')}</tbody>
     </table></div>
   </section>`;
@@ -784,8 +790,19 @@ function celdaEstado(l, cid) {
 function validar(cid, lid, ok) {
   const l = camion(cid).lecturas.find(x => x.id === lid);
   if (ok) { l.estado = 'validado'; toast('Registro validado'); }
-  else { const nota = prompt('¿Qué tiene de malo este registro? (le llegará al empleado)', 'No se lee bien el número en la foto.'); if (nota === null) return; l.estado = 'observado'; l.nota = nota; toast('Registro observado'); }
+  else { const nota = prompt('¿Qué tiene de malo este registro? (queda anotado en el registro)', 'No se lee bien el número en la foto.'); if (nota === null) return; l.estado = 'observado'; l.nota = nota; toast('Registro observado'); }
   guardar(); render();
+}
+
+// El dueño registra la lectura desde la ficha del camión; queda validada porque la anota él mismo
+function registrarDueno(ev, id) {
+  ev.preventDefault();
+  const c = camion(id), txt = ev.target.lectura.value;
+  const v = leerNumero(txt);
+  const error = txt.trim() ? validarLectura(c, v) : 'Escribe el número del horómetro, solo con números.';
+  if (error) { toast(error); ev.target.lectura.focus(); return; }
+  c.lecturas.push({ id: 'l' + Date.now(), fecha: Date.now(), valor: v, usuario: 'u0', foto: false, img: null, estado: 'validado', sync: 'enviado' });
+  guardar(); toast(`Horómetro registrado: ${n1(v)} h`); render();
 }
 
 /* ============ Dueño: Contratos ============ */
@@ -981,7 +998,7 @@ VISTAS.horometros = () => {
   pend.sort((a, b) => b.l.fecha - a.l.fecha);
   return `
   <div class="cab"><div><h1>Horómetros</h1><p class="sec" style="margin:0">Horas de motor de cada camión respecto de su límite.</p></div>
-    <div class="acciones no-print"><a class="btn chico wsp" href="#wsp">${ic('send')}Probar registro por WhatsApp</a><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
+    <div class="acciones no-print"><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
   <div class="kpis k3">
     ${kpi(cerca ? 'porvencer' : '', cerca, 'Cerca del límite', 'gauge')}
     ${kpi(sr ? 'sinreporte' : '', sr, 'Sin reporte', 'wifi-off')}
@@ -1185,7 +1202,7 @@ VISTAS.editar = id => {
     <label class="campo">Patente<input name="patente" required value="${esc(c.patente)}" autocapitalize="characters"></label>
     <label class="campo">Tipo de equipo<input name="tipo" required value="${esc(c.tipo)}" placeholder="Camión tolva, aljibe…"></label>
     <label class="campo">Marca y modelo<input name="modelo" value="${esc(c.modelo)}"></label>
-    <label class="campo">Empleado que registra el horómetro<select name="operador"><option value="">— Nadie —</option>${emps.map(o => `<option value="${o.id}" ${o.id === c.operador ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></label>
+    <label class="campo" hidden>Empleado que registra el horómetro<select name="operador"><option value="">— Nadie —</option>${emps.map(o => `<option value="${o.id}" ${o.id === c.operador ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></label>
     <label class="campo">Límite de horas de motor<input name="limite" type="number" min="1" required value="${c.limite}" inputmode="numeric"></label>
     <label class="campo">Vencimiento de la revisión técnica<input name="rtVence" type="date" required value="${c.rtVence}"></label>
     ${nuevo ? '<label class="campo">Lectura actual del horómetro<input name="inicial" type="number" min="0" step="0.1" required inputmode="decimal"></label>' : ''}

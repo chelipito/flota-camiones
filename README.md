@@ -9,7 +9,7 @@ App web para una empresa que es **dueña de camiones y los arrienda** a otras em
 - **Repositorio:** https://github.com/chelipito/flota-camiones
 - **Brief:** `00-Ideas/flota-camiones.md` · **Diseño:** `02-Diseño/flota-camiones.md`
 
-> Estado actual: **prototipo con datos de ejemplo** (versión 8). Todo se guarda en el navegador de cada persona y no hay base de datos todavía. El siguiente paso es conectar **Supabase**.
+> Estado actual: **prototipo con datos de ejemplo** (versión 9). Todo se guarda en el navegador de cada persona y no hay base de datos todavía. El siguiente paso es conectar **Supabase**.
 
 ## Pantallas
 
@@ -19,7 +19,7 @@ App web para una empresa que es **dueña de camiones y los arrienda** a otras em
 | Dueño | **Flota** | Lista de camiones con filtro Todos / Arrendados / Disponibles. Detalle de cada camión |
 | Dueño | **Contratos** | Lista de contratos (empresa, camiones, término, estado). El detalle incluye el administrador de contrato con llamar, WhatsApp y correo, y la **ficha descargable en Word o PDF** |
 | Dueño | **Revisiones técnicas** | Lista ordenada por vencimiento |
-| Dueño | **Horómetros** | Registros por validar (foto vs. número) y lista de horas vs. límite |
+| Dueño | **Horómetros** | Registros por validar (foto vs. número) y lista de horas vs. límite. El dueño registra una lectura nueva desde la ficha de cada camión |
 | Dueño | **Avisos** | Mensaje armado con todo lo que vence, para enviarlo por WhatsApp o correo |
 | Dueño | **Usuarios y accesos** | Quién entra y con qué perfil (Dueño / Empleado / Cliente) |
 | Dueño | **Configuración** | Empresa, contacto y cuántos días o qué % antes avisar |
@@ -27,7 +27,7 @@ App web para una empresa que es **dueña de camiones y los arrienda** a otras em
 | Empleado | **WhatsApp (simulación)** | Escribe "KDLP21 7450" y el bot valida y registra |
 | Cliente | **Mis camiones** | Ve sus camiones arrendados y la vigencia de su contrato (solo lectura) |
 
-En la demo, la app abre en la vista del Dueño. Las otras vistas están en el menú → **"Ver como empleado o cliente"**.
+**Desde la versión 9 solo se muestra la vista del Dueño.** Las vistas Empleado, Cliente, WhatsApp (simulación) y Usuarios y accesos quedan **escondidas** (el código sigue en el archivo, lista `ESCONDIDAS`), por si se usan más adelante.
 
 ## Reglas del horómetro
 - La lectura nunca puede bajar respecto de la anterior.
@@ -53,6 +53,10 @@ En la demo, la app abre en la vista del Dueño. Las otras vistas están en el me
 | 2026-10-25 | **Colores neutros** y **listas de una fila** en vez de tarjetas | El usuario encontró la interfaz recargada |
 | 2026-10-25 | Sin nombres personales en la app (el dueño de ejemplo se llama "Administración") | Pedido del usuario |
 | 2026-10-25 | Celular: indicadores compactos en una sola fila | Pedido del usuario |
+| 2026-11-02 | Solo se muestra la vista del **Dueño**; Empleado, Cliente, WhatsApp y Usuarios quedan escondidos | Lo que se le ofrece al dueño es ordenar su flota; él ve todo |
+| 2026-11-02 | El dueño registra el horómetro desde la ficha del camión (sin foto, queda validado) | Sin la vista Empleado no había otra forma de registrarlo |
+| 2026-11-02 | Un contrato puede incluir **varios camiones** | Confirmado por el usuario |
+| 2026-11-02 | Cobro por **mensualidad** (idea: $200.000, sin validar) | Precio aún por definir |
 
 ## Avisos automáticos (versión real)
 - **Correo:** función programada en Supabase. Simple y barato.
@@ -60,11 +64,9 @@ En la demo, la app abre en la vista del Dueño. Las otras vistas están en el me
 
 ## Pendientes
 - [ ] Nombre y logo de la empresa cliente.
-- [ ] ¿Los camiones tienen **GPS o telemetría** que entregue las horas de motor?
-- [ ] Qué ve exactamente el **cliente** (por ejemplo, ¿ve una revisión técnica vencida?).
-- [ ] ¿Un contrato puede incluir **varios camiones**? (el prototipo lo permite).
+- [ ] Proyecto aparte de **telemetría** (hoy los camiones no tienen GPS ni telemetría).
 - [ ] **Límite real de horas** de cada camión y de dónde sale.
-- [ ] Modelo de cobro (implementación + mensualidad, o por camión).
+- [ ] Precio final de la mensualidad (idea: $200.000).
 - [ ] Simplificar las pantallas de detalle (camión, contrato, cliente).
 - [ ] Conectar **Supabase**: login, tablas, fotos, funciones programadas.
 
