@@ -215,6 +215,11 @@ th{color:var(--texto-2);font-weight:600}
 .vacio{text-align:center;color:var(--texto-2);padding:24px}
 .filtros{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
 .regla{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:.5rem 0}
+.alerta-cuerpo{display:grid;gap:12px}
+@media (min-width:760px){.alerta-cuerpo{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
+.ejemplo{background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:10px;padding:.75rem .9rem;font-size:.92rem;color:#334155}
+.ejemplo b{color:#0F172A}
+.ejemplo .t{display:block;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748B;margin-bottom:.25rem}
 .regla input{width:6.5rem;text-align:right}
 .etiqueta-canal{display:inline-block;font-size:.8rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;background:var(--ok-f, #ecfdf5);color:var(--ok-t, #065f46);margin-left:6px;vertical-align:middle}
 .etiqueta-canal.app{background:#f1f5f9;color:#475569}
@@ -288,7 +293,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 19</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 20</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -1282,6 +1287,12 @@ async function avisoPrueba(btn) {
   catch (e) { if (e.message !== 'sesión') toast('No se pudo enviar: ' + e.message); }
   btn.disabled = false;
 }
+async function revisarTodo(btn) { // la misma revisión que se hace sola cada día, pero al tiro
+  btn.disabled = true;
+  try { const d = await llamarAvisos({}); toast(d.enviados ? `Se ${d.enviados === 1 ? 'envió 1 aviso' : `enviaron ${d.enviados} avisos`} por WhatsApp` : 'Todo revisado: no hay avisos nuevos'); cargarEnviados(); }
+  catch (e) { if (e.message !== 'sesión') toast('No se pudo revisar: ' + e.message); }
+  btn.disabled = false;
+}
 let ENVIADOS = null;
 async function cargarEnviados() {
   try {
@@ -1297,9 +1308,10 @@ function tarjetaAvisosAuto() {
   const cfg = S.config;
   return `<section class="tarjeta">
       <h2>Avisos automáticos</h2>
-      <p class="sec">Cada vez que llega un registro del horómetro, la app revisa la <b>mantención (cada ${n0(cfg.intervaloMant)} h)</b> y el <b>límite de horas</b>. Si algo queda por vencer, urgente o atrasado, le llega un WhatsApp al dueño. Cada aviso llega una sola vez.</p>
+      <p class="sec">Cada vez que llega un registro del horómetro se revisan la <b>mantención (cada ${n0(cfg.intervaloMant)} h)</b> y el <b>límite de horas</b>. La <b>revisión técnica</b> se revisa sola todos los días a las 9:00. Si algo queda por vencer, urgente o atrasado, le llega un WhatsApp a los números de la empresa. Cada aviso llega una sola vez.</p>
       ${cfg.wsp ? `<p>Se envían a: <b>${listaContactos(cfg.wsp).map(esc).join(', ')}</b> · <a href="#ajustes">cambiar</a></p>` : `<div class="error" role="alert">Falta el número que recibe los avisos. Agrégalo en <a href="#ajustes">Configuración → Empresa y contactos</a>.</div>`}
-      <button class="btn no-print" onclick="avisoPrueba(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('send')}Enviar aviso de prueba</button>
+      <div class="acciones no-print"><button class="btn" onclick="avisoPrueba(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('send')}Enviar aviso de prueba</button>
+        <button class="btn" onclick="revisarTodo(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('bell')}Revisar ahora</button></div>
       <h3 style="margin-top:16px">Últimos avisos enviados</h3>
       <div id="enviados">${htmlEnviados()}</div>
     </section>`;
@@ -1544,36 +1556,52 @@ function guardarEmpresa(ev) {
 function ajustesAlertas(cfg) {
   const n = (k, unidad, extra = '') => `<input name="${k}" type="number" min="0" inputmode="numeric" value="${esc(cfg[k])}" required ${extra}> ${unidad}`;
   const auto = '<span class="etiqueta-canal">WhatsApp automático</span>', app = '<span class="etiqueta-canal app">Se muestra en la app</span>';
-  return `<form onsubmit="guardarAlertas(event)">
-    <section class="tarjeta">
-      <h2>Mantención ${auto}</h2>
+  const tarjeta = (titulo, canal, reglas, id, nota = '') => `<section class="tarjeta"><h2>${titulo} ${canal}</h2>
+    <div class="alerta-cuerpo"><div>${reglas}${nota ? `<p class="sec" style="margin:0">${nota}</p>` : ''}</div><div class="ejemplo" id="ej-${id}"></div></div></section>`;
+  setTimeout(() => pintarEjemplos(cfg));
+  return `<form onsubmit="guardarAlertas(event)" oninput="pintarEjemplos(Object.fromEntries([...new FormData(this)].map(([k, v]) => [k, Number(v) || 0])))">
+    ${tarjeta('Mantención', auto, `
       <label class="regla">Hacer mantención cada ${n('intervaloMant', 'horas de motor', 'min="1"')}</label>
       <label class="regla">🟡 Avisar cuando falten ${n('horasMantAviso', 'horas')}</label>
-      <label class="regla">🔴 Avisar urgente cuando falten ${n('horasMantUrgente', 'horas')}</label>
-      <p class="sec" style="margin:0">Si pasa la mantención y nadie la registra, llega un aviso de "atrasada".</p>
-    </section>
-    <section class="tarjeta">
-      <h2>Horómetro: límite total de horas ${auto}</h2>
+      <label class="regla">🔴 Avisar urgente cuando falten ${n('horasMantUrgente', 'horas')}</label>`, 'mant', 'Se repite: después de cada mantención empieza la cuenta para la siguiente.')}
+    ${tarjeta('Horómetro: límite total de horas', auto, `
       <label class="regla">🟡 Avisar cuando llegue al ${n('pctAviso', '% del límite', 'max="100"')}</label>
-      <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>
-      <p class="sec" style="margin:0">El límite de cada camión está en su ficha (Flota → camión).</p>
-    </section>
-    <section class="tarjeta">
-      <h2>Revisión técnica ${app}</h2>
+      <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>`, 'lim', 'No se repite. El límite de cada camión está en su ficha (Flota → camión → Editar datos).')}
+    ${tarjeta('Revisión técnica', auto, `
       <label class="regla">🟡 Avisar ${n('diasPorVencer', 'días antes del vencimiento')}</label>
-      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>
-    </section>
-    <section class="tarjeta">
-      <h2>Contratos de arriendo ${app}</h2>
+      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>`, 'rt', 'Se revisa sola todos los días a las 9:00.')}
+    ${tarjeta('Contratos de arriendo', app, `
       <label class="regla">🟡 Avisar para renegociar ${n('diasContratoAviso', 'días antes del término')}</label>
-      <label class="regla">🔴 Urgente ${n('diasContratoUrgente', 'días antes')}</label>
-    </section>
-    <section class="tarjeta">
-      <h2>Camiones sin reporte ${app}</h2>
-      <label class="regla">Avisar si un camión arrendado pasa ${n('diasSinReporte', 'días sin registrar el horómetro')}</label>
-    </section>
+      <label class="regla">🔴 Urgente ${n('diasContratoUrgente', 'días antes')}</label>`, 'con')}
+    ${tarjeta('Camiones sin reporte', app, `
+      <label class="regla">Avisar si un camión arrendado pasa ${n('diasSinReporte', 'días sin registrar el horómetro')}</label>`, 'sr')}
     <button class="btn pri" style="margin-bottom:16px">Guardar alertas</button>
   </form>`;
+}
+// Ejemplos con los números que el dueño está escribiendo (se actualizan mientras escribe)
+function pintarEjemplos(c) {
+  const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = '<span class="t">Ejemplo</span>' + html; };
+  const iv = c.intervaloMant || 250, base = 7250, prox = base + iv;
+  pon('mant', `La última mantención fue a las <b>${n0(base)} h</b>, así que la próxima es a las <b>${n0(prox)} h</b>.<br>
+    🟡 Al llegar a <b>${n0(prox - c.horasMantAviso)} h</b> te llega: "faltan ${n0(c.horasMantAviso)} h para la mantención".<br>
+    🔴 A las <b>${n0(prox - c.horasMantUrgente)} h</b>: "urgente, faltan ${n0(c.horasMantUrgente)} h".<br>
+    Cuando registras la mantención, la cuenta vuelve a partir: la siguiente es a las <b>${n0(prox + iv)} h</b>.`);
+  const lim = 12000;
+  pon('lim', `El camión no debería pasar de <b>${n0(lim)} h</b> en total (por vida útil, garantía o contrato).<br>
+    🟡 Al llegar a <b>${n0(lim * c.pctAviso / 100)} h</b> (${n0(c.pctAviso)}%) te llega un aviso.<br>
+    🔴 A las <b>${n0(lim * c.pctUrgente / 100)} h</b> (${n0(c.pctUrgente)}%), el aviso urgente.<br>
+    Es como el kilometraje total de un auto: pasa una sola vez. La mantención es como el cambio de aceite: se repite.`);
+  const vence = new Date(hoy0().getTime() + 45 * DIA);
+  pon('rt', `La revisión técnica vence el <b>${fecha(vence)}</b>.<br>
+    🟡 El <b>${fecha(vence.getTime() - c.diasPorVencer * DIA)}</b> (${n0(c.diasPorVencer)} días antes) te llega un aviso por WhatsApp.<br>
+    🔴 El <b>${fecha(vence.getTime() - c.diasUrgente * DIA)}</b> (${n0(c.diasUrgente)} días antes), el aviso urgente.<br>
+    Si se vence, te llega "vencida". Cuando cambias la fecha en la ficha del camión, la cuenta parte de nuevo.`);
+  const termino = new Date(hoy0().getTime() + 90 * DIA);
+  pon('con', `El contrato termina el <b>${fecha(termino)}</b>.<br>
+    🟡 Desde el <b>${fecha(termino.getTime() - c.diasContratoAviso * DIA)}</b> aparece en la app para renegociar.<br>
+    🔴 Desde el <b>${fecha(termino.getTime() - c.diasContratoUrgente * DIA)}</b>, como urgente.`);
+  pon('sr', `Un camión arrendado registró el horómetro el lunes.<br>
+    Si pasan <b>${n0(c.diasSinReporte)} días</b> sin un registro nuevo, aparece en la app como "sin reporte", para que le preguntes al empleado.`);
 }
 function guardarAlertas(ev) {
   ev.preventDefault();
@@ -1633,7 +1661,10 @@ async function guardarCamion(ev, id) {
       lecturas: [{ id: 'l' + Date.now(), fecha: fechaL, valor: Number(d.inicial), usuario: 'u0', quien: 'Lectura inicial', foto: false, estado: 'validado', sync: 'enviado' }] };
     S.camiones.push(c); guardar(); toast(REAL ? `Camión agregado. Ya puede registrar por WhatsApp: ${c.patente} y el número` : 'Camión agregado'); ir('camion/' + c.id);
     if (REAL) { FIRMA = ''; traerLecturas(); }
-  } else { Object.assign(camion(id), datos); guardar(); toast('Cambios guardados'); ir('camion/' + id); }
+  } else {
+    Object.assign(camion(id), datos); guardar(); toast('Cambios guardados'); ir('camion/' + id);
+    if (REAL) setTimeout(() => revisarAvisos(datos.patente), 2500); // espera a que el cambio se suba a Supabase
+  }
 }
 async function quitarCamion(id) {
   const c = camion(id);

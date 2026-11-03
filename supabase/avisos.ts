@@ -1,7 +1,8 @@
 // Control de Flota · función "avisos" de Supabase (Edge Function)
-// Revisa el horómetro de los camiones y le manda un WhatsApp automático al dueño cuando la mantención
-// (cada X horas) o el límite de horas pasan a "por vencer", "urgente" o "atrasado". Cada aviso se manda una sola vez.
-// La llaman: la función "whatsapp" al recibir un registro, y la app al registrar el horómetro o al probar los avisos.
+// Le manda un WhatsApp automático al dueño cuando la mantención (cada X horas), el límite de horas o la
+// revisión técnica pasan a "por vencer", "urgente" o "atrasado/vencida". Cada aviso se manda una sola vez.
+// La llaman: la función "whatsapp" al recibir un registro, la app (registros, cambios y "Revisar ahora")
+// y una tarea programada de Supabase todos los días a las 9:00 (supabase/avisos-diarios.sql).
 // Usa los mismos secretos que la función "whatsapp" (WHATSAPP_TOKEN y WHATSAPP_PHONE_ID).
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
@@ -18,6 +19,10 @@ const json = (cuerpo: unknown, status = 200) => new Response(JSON.stringify(cuer
 const DIA = 86400000;
 const n1 = (v: number) => v.toLocaleString('es-CL', { maximumFractionDigits: 1 });
 const n0 = (v: number) => Math.round(v).toLocaleString('es-CL');
+// Fecha de hoy en Chile (AAAA-MM-DD) y días hasta otra fecha AAAA-MM-DD
+const hoyChile = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Santiago' });
+const utc = (iso: string) => { const [a, m, d] = iso.split('-').map(Number); return Date.UTC(a, m - 1, d); };
+const diasHasta = (iso: string) => Math.round((utc(iso) - utc(hoyChile())) / DIA);
 const fecha = (ms: number) => new Date(ms).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Santiago' });
 
 // Envía un texto por WhatsApp. Si el dueño no ha escrito en las últimas 24 h, WhatsApp exige una plantilla
@@ -60,6 +65,13 @@ function revisar(cam: any, ls: { valor: number; fecha: number }[], ficha: any, c
   const el = pct >= 100 ? 'vencido' : pct >= (cfg.pctUrgente ?? 95) ? 'urgente' : pct >= (cfg.pctAviso ?? 80) ? 'porvencer' : 'ok';
   if (el !== 'ok') avisos.push({ clave: `${cam.patente}|limite|${el}`,
     texto: `${el === 'vencido' ? '🔴 Superado' : ETQ[el]} · Límite de horas\n${nombre}: ${n1(actual)} de ${n0(Number(cam.limite))} h (${Math.floor(pct)}% del límite).` });
+  // Revisión técnica: depende de la fecha guardada en la ficha del camión
+  if (ficha?.rtVence) {
+    const d = diasHasta(ficha.rtVence), vence = fecha(utc(ficha.rtVence) + 12 * 3600000);
+    const er = d <= 0 ? 'vencido' : d <= (cfg.diasUrgente ?? 7) ? 'urgente' : d <= (cfg.diasPorVencer ?? 30) ? 'porvencer' : 'ok';
+    if (er !== 'ok') avisos.push({ clave: `${cam.patente}|rt|${ficha.rtVence}|${er}`,
+      texto: `${er === 'vencido' ? '🔴 Vencida' : ETQ[er]} · Revisión técnica\n${nombre}: ${d < 0 ? `venció el ${vence} (hace ${-d} ${d === -1 ? 'día' : 'días'})` : d === 0 ? `vence hoy (${vence})` : `vence el ${vence} (en ${d} ${d === 1 ? 'día' : 'días'})`}.` });
+  }
   const resumen = resta > 0 ? `Faltan ${n0(resta)} h para la mantención de las ${n0(prox)} h${cuando}.` : `⚠️ Mantención atrasada ${n0(-resta)} h (tocaba a las ${n0(prox)} h).`;
   return { avisos, resumen };
 }
@@ -67,13 +79,13 @@ function revisar(cam: any, ls: { valor: number; fecha: number }[], ficha: any, c
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
 
-  // Puede llamarla la función "whatsapp" (clave del servidor) o un usuario con sesión
-  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-  if (token !== SERVICIO) {
-    const { data, error } = await db.auth.getUser(token);
-    if (error || !data?.user) return json({ error: 'Debes iniciar sesión' }, 401);
-  }
   const { patente, prueba } = await req.json().catch(() => ({}));
+  // La revisión de todos los camiones (tarea diaria) no necesita sesión: solo manda avisos que ya corresponden,
+  // una sola vez cada uno. El aviso de prueba y el resumen de un camión sí: función "whatsapp" (clave del servidor) o usuario con sesión.
+  const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
+  let conSesion = token === SERVICIO;
+  if (!conSesion && token) { const { data } = await db.auth.getUser(token); conSesion = !!data?.user; }
+  if ((prueba || patente) && !conSesion) return json({ error: 'Debes iniciar sesión' }, 401);
 
   const { data: est } = await db.from('estado_app').select('datos').eq('id', 1).maybeSingle();
   const datos = est?.datos ?? {}, cfg = datos.config ?? {};
@@ -107,5 +119,5 @@ Deno.serve(async (req) => {
       else await db.from('avisos_enviados').delete().eq('clave', a.clave); // no salió: se reintenta en el próximo registro
     }
   }
-  return json({ resumen, enviados, sinDestino: !destinos.length });
+  return json(conSesion ? { resumen, enviados, sinDestino: !destinos.length } : { enviados });
 });
