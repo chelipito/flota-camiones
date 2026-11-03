@@ -55,7 +55,9 @@ async function procesar(msg: any, nombre: string) {
   const { data: ult } = await db.from('lecturas').select('valor, fecha').eq('patente', cam.patente).order('fecha', { ascending: false }).limit(1).maybeSingle();
   const v = leido.valor;
   if (ult && v < Number(ult.valor)) return responder(de, `❌ ${v} es menor que la última lectura (${n1(Number(ult.valor))} h). El horómetro nunca baja: revisa el número.`);
-  if (ult) {
+  // Regla opcional de horas imposibles: se activa en la app (Configuración → Alertas → Registro del horómetro)
+  const { data: est } = await db.from('estado_app').select('datos').eq('id', 1).maybeSingle();
+  if (ult && est?.datos?.config?.validarSalto) {
     const pasaron = (Date.now() - Date.parse(ult.fecha)) / 3600000;
     if (v - Number(ult.valor) > pasaron + 0.5) return responder(de, `❌ Son ${horas(v - Number(ult.valor))} más que la última vez, pero solo han pasado ${horas(pasaron)}. Revisa el número.`);
   }

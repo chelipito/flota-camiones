@@ -1,7 +1,8 @@
 -- Control de Flota · registrar el horómetro desde la app (además de WhatsApp)
 -- Cómo usarlo: Supabase → SQL Editor → pestaña nueva (+) → pega todo esto → Run. Se ejecuta una sola vez.
--- Solo usuarios con sesión. Aplica las mismas reglas que WhatsApp: el horómetro nunca baja
--- y no puede subir más horas de las que pasaron desde la última lectura.
+-- Solo usuarios con sesión. Aplica las mismas reglas que WhatsApp: el horómetro nunca baja y, si está activada
+-- en la app (Configuración → Alertas → Registro del horómetro), no puede subir más horas de las que pasaron.
+-- Si ya lo habías ejecutado, ejecútalo de nuevo: reemplaza la versión anterior.
 create or replace function registrar_lectura(p_patente text, p_valor numeric)
 returns void
 language plpgsql
@@ -20,7 +21,8 @@ begin
       raise exception 'El número es menor que la última lectura (% h). El horómetro nunca baja: revisa el número.', ult.valor;
     end if;
     pasaron := extract(epoch from (now() - ult.fecha)) / 3600;
-    if p_valor - ult.valor > pasaron + 0.5 then
+    if coalesce((select (datos -> 'config' ->> 'validarSalto')::boolean from estado_app where id = 1), false)
+       and p_valor - ult.valor > pasaron + 0.5 then
       raise exception 'Son % horas más que la última vez, pero solo han pasado % horas. Revisa el número.', round(p_valor - ult.valor, 1), round(pasaron, 1);
     end if;
   end if;

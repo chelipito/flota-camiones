@@ -293,7 +293,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 20</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 21</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -415,7 +415,7 @@ function crearDemo() {
   return {
     creado: Date.now(), rol: 'dueno', sinSenalDemo: false,
     config: { empresa: 'Transportes Ejemplo', telefono: '+56 9 0000 0000', wsp: '', correo: '',
-      diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15, intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10 },
+      diasPorVencer: 30, diasUrgente: 7, pctAviso: 80, pctUrgente: 95, diasSinReporte: 2, diasContratoAviso: 60, diasContratoUrgente: 15, intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false },
     usuarios, contratos, camiones
   };
 }
@@ -424,7 +424,7 @@ try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
 S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
 // completa datos guardados con versiones anteriores (también al traer el estado desde Supabase)
-function completarDatos() { S.config = { intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, ...S.config }; }
+function completarDatos() { S.config = { intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, ...S.config }; }
 completarDatos();
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() {
@@ -1559,7 +1559,11 @@ function ajustesAlertas(cfg) {
   const tarjeta = (titulo, canal, reglas, id, nota = '') => `<section class="tarjeta"><h2>${titulo} ${canal}</h2>
     <div class="alerta-cuerpo"><div>${reglas}${nota ? `<p class="sec" style="margin:0">${nota}</p>` : ''}</div><div class="ejemplo" id="ej-${id}"></div></div></section>`;
   setTimeout(() => pintarEjemplos(cfg));
-  return `<form onsubmit="guardarAlertas(event)" oninput="pintarEjemplos(Object.fromEntries([...new FormData(this)].map(([k, v]) => [k, Number(v) || 0])))">
+  return `<form onsubmit="guardarAlertas(event)" oninput="pintarEjemplos({ ...Object.fromEntries([...new FormData(this)].map(([k, v]) => [k, Number(v) || 0])), validarSalto: this.validarSalto.checked })">
+    ${tarjeta('Registro del horómetro', '<span class="etiqueta-canal app">Regla</span>', `
+      <p class="regla" style="margin-top:0">✅ Siempre activo: el horómetro nunca puede bajar.</p>
+      <label class="check"><input type="checkbox" name="validarSalto" ${cfg.validarSalto ? 'checked' : ''}> No aceptar más horas de las que pasaron desde el último registro</label>`, 'reg',
+      'Sirve para detectar errores de tipeo. Aplica en la app y en WhatsApp.')}
     ${tarjeta('Mantención', auto, `
       <label class="regla">Hacer mantención cada ${n('intervaloMant', 'horas de motor', 'min="1"')}</label>
       <label class="regla">🟡 Avisar cuando falten ${n('horasMantAviso', 'horas')}</label>
@@ -1581,6 +1585,9 @@ function ajustesAlertas(cfg) {
 // Ejemplos con los números que el dueño está escribiendo (se actualizan mientras escribe)
 function pintarEjemplos(c) {
   const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = '<span class="t">Ejemplo</span>' + html; };
+  pon('reg', c.validarSalto
+    ? `El último registro fue <b>7.450 h</b>, hace <b>2 horas</b>.<br>Si alguien manda <b>7.540</b> (un dedazo por 7.454), se rechaza: el motor no puede haber trabajado 90 horas en 2.<br>Con <b>7.452</b> se acepta.`
+    : `<b>Apagada:</b> se acepta cualquier número igual o mayor al anterior.<br>Si alguien manda <b>7.540</b> en vez de 7.454, se guarda tal cual y los cálculos de mantención quedan corridos.<br>Actívala para evitarlo.`);
   const iv = c.intervaloMant || 250, base = 7250, prox = base + iv;
   pon('mant', `La última mantención fue a las <b>${n0(base)} h</b>, así que la próxima es a las <b>${n0(prox)} h</b>.<br>
     🟡 Al llegar a <b>${n0(prox - c.horasMantAviso)} h</b> te llega: "faltan ${n0(c.horasMantAviso)} h para la mantención".<br>
@@ -1606,7 +1613,8 @@ function pintarEjemplos(c) {
 function guardarAlertas(ev) {
   ev.preventDefault();
   const nuevo = { ...S.config };
-  for (const [k, v] of new FormData(ev.target)) nuevo[k] = Math.max(0, Number(v) || 0);
+  for (const [k, v] of new FormData(ev.target)) if (k !== 'validarSalto') nuevo[k] = Math.max(0, Number(v) || 0);
+  nuevo.validarSalto = ev.target.validarSalto.checked;
   if (nuevo.intervaloMant < 1) { toast('La mantención debe ser cada 1 hora o más'); return; }
   if (nuevo.horasMantAviso >= nuevo.intervaloMant) { toast('El aviso de mantención debe ser menor que el intervalo de mantención'); return; }
   const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica'], ['diasContratoUrgente', 'diasContratoAviso', 'Contratos']]
@@ -1758,7 +1766,7 @@ function validarLectura(c, v) {
   const u = ultima(c, true);
   if (isNaN(v) || v <= 0) return 'Escribe el número del horómetro, solo con números.';
   if (u && v < u.valor) return `El número es menor que la última vez (${n1(u.valor)} h). El horómetro nunca baja: revisa que esté bien escrito.`;
-  if (u) {
+  if (u && S.config.validarSalto) { // regla opcional (Configuración → Alertas → Registro del horómetro)
     const pasaron = (Date.now() - u.fecha) / 3600000;
     if (v - u.valor > pasaron + 0.5) return `Son ${n1(v - u.valor)} horas más que la última vez, pero desde entonces solo han pasado ${n1(pasaron)} horas. Revisa el número.`;
   }
