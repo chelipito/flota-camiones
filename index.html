@@ -277,6 +277,35 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .redondo.enviar{background:#128C7E;color:#fff}
 .redondo .ico{width:22px;height:22px}
 @media (prefers-reduced-motion:no-preference){.btn,.kpi{transition:filter .15s}.btn:hover,.kpi:hover{filter:brightness(.95)}}
+/* Celular (dueño): pestañas abajo, barra superior blanca y simple, todo un poco más compacto. Mismo contenido que en el computador. */
+.tabbar{display:none}
+@media (max-width:899px){
+  body.con-side{--top-bg:#FFFFFF;--top-fg:#111111;--top-btn:rgba(0,0,0,.06);font-size:15px}
+  body.con-side .top{min-height:52px;padding:.35rem 12px;border-bottom:1px solid var(--borde)}
+  body.con-side .btn-menu,body.con-side .top .avatar,body.con-side #campana,body.con-side .no-movil{display:none !important}
+  body.con-side .top .pill:not(.off){display:none}
+  body.con-side .top .volver{min-height:40px;padding:0 .5rem}
+  body.con-side .top .volver .volver-txt{display:none}
+  body.con-side .top .marca{font-size:1rem}
+  body.con-side .top .volver:not([hidden]) ~ .marca .logo{display:none}
+  body.con-side .top .volver:not([hidden]) ~ .marca .marca-txt{position:static;width:auto;height:auto;overflow:hidden;clip:auto}
+  body.con-side .demo-banda:not(.alerta){display:none}
+  body.con-side main{padding:14px 12px calc(84px + env(safe-area-inset-bottom))}
+  body.con-side h1{font-size:1.3rem}
+  body.con-side h2{font-size:1.05rem}
+  body.con-side .tarjeta{padding:14px;margin-bottom:10px}
+  body.con-side .btn{min-height:44px;padding:.5rem .9rem}
+  body.con-side .btn.chico{min-height:38px;padding:.3rem .7rem;font-size:.9rem}
+  body.con-side .lista-fila{padding:11px 14px}
+  body.con-side .cab{margin-bottom:10px}
+  body.con-side .tabbar{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid var(--borde);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+  .tabbar a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:52px;color:#64748B;text-decoration:none;font-size:.72rem;font-weight:600;position:relative;border-radius:10px}
+  .tabbar a .ico{width:22px;height:22px}
+  .tabbar a[aria-current="page"]{color:#111}
+  .tabbar a[aria-current="page"] .ico{color:#111;background:var(--acento);border-radius:999px;padding:3px 12px;width:46px;height:28px;box-sizing:border-box}
+  .tabbar .badge{position:absolute;top:2px;left:calc(50% + 6px);min-width:18px;height:18px;font-size:.7rem;display:grid;place-items:center;padding:0 4px}
+}
+@media print{.tabbar{display:none !important}}
 @media print{.side,.scrim,.top,.demo-banda,.no-print{display:none !important}body.con-side .contenido{margin-left:0}main{padding:0}.tarjeta{break-inside:avoid}.papel{border:0;box-shadow:none;padding:0}}
 </style>
 </head>
@@ -286,15 +315,16 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 <div class="contenido">
   <header class="top">
     <button class="btn-ico btn-menu" id="btnMenu" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="side" onclick="abrirMenu()" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-menu"/></svg></button>
-    <button id="btnVolver" class="volver" type="button" onclick="volverAtras()" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg>Volver</button>
+    <button id="btnVolver" class="volver" type="button" onclick="volverAtras()" hidden><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-back"/></svg><span class="volver-txt">Volver</span></button>
     <a class="marca" id="marca" href="#inicio"><svg class="ico logo" viewBox="0 0 24 24" aria-hidden="true"><use href="#i-truck"/></svg><span class="marca-txt">Control de Flota</span></a>
     <div class="migas" id="migas"></div>
     <span id="estadoRed" class="pill"></span>
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 26</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 27</div>
   <main id="app"></main>
+  <nav class="tabbar no-print" id="tabbar" aria-label="Navegación principal"></nav>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 
@@ -520,7 +550,7 @@ async function traerLecturas() {
       const c = S.camiones[0], k = cams[0];
       if (c.patente !== k.patente || c.limite !== Number(k.limite)) { c.patente = k.patente; c.limite = Number(k.limite); cambioCamion = true; guardar(); }
     }
-    $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : '');
+    $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : ''); $('#banda').classList.remove('alerta');
     const firma = filas.map(f => f.id).join() + JSON.stringify(S.estados);
     if (firma === FIRMA && !cambioCamion && !cambioEstado) return;
     FIRMA = firma;
@@ -540,7 +570,7 @@ async function traerLecturas() {
     if (!escribiendo) render();
   } catch (e) {
     if (e.sesion) return sesionPerdida();
-    $('#banda').textContent = 'Sin conexión con la base de datos · reintentando…';
+    $('#banda').textContent = 'Sin conexión con la base de datos · reintentando…'; $('#banda').classList.add('alerta');
   }
 }
 
@@ -702,8 +732,9 @@ const MENU = [
   ['avisos', 'bell', 'Avisos']
 ]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
 if (REAL) MENU.push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
-const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
-const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil'], ['mi-cuenta', 'Mi cuenta']]);
+const PESTAÑAS = ['inicio', 'flota', 'horometros', 'avisos'];
+const SECCION = { mas: 'mas', wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
+const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil'], ['mi-cuenta', 'Mi cuenta'], ['mas', 'Más']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
 const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'editar-usuario', ...(REAL ? ['wsp'] : ['usuarios', 'mi-cuenta'])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
@@ -748,12 +779,35 @@ function pintarMenu(r) {
   $('#avatar').innerHTML = ini || ic('user');
   $('#avatar').href = REAL ? '#mi-cuenta' : '#ajustes';
   $('#migas').innerHTML = `<span class="seccion-marca">FLOTA</span><span aria-hidden="true">›</span><span>${esc(TITULO[base] || '')}</span>`;
+  pintarTabbar(base, pend, avisos);
+  // celular: en las pantallas principales, la barra muestra el nombre de la empresa; en las demás, el título
+  $('#marca .marca-txt').textContent = enCelular() && !PESTAÑAS.includes(r) && r !== 'mas' ? (TITULO[base] || '') : (S.config.empresa || 'Control de Flota');
+}
+// Celular: pestañas abajo (Inicio, Flota, Horómetros, Avisos, Más)
+const enCelular = () => matchMedia('(max-width:899px)').matches;
+function pintarTabbar(base, pend, avisos) {
+  const tab = PESTAÑAS.includes(base) ? base : 'mas';
+  const t = (k, i, txt, n) => `<a href="#${k}" ${tab === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${txt}</span>${n ? `<span class="badge">${n}</span>` : ''}</a>`;
+  $('#tabbar').innerHTML = t('inicio', 'home', 'Inicio') + t('flota', 'truck', 'Flota') + t('horometros', 'gauge', 'Horómetro', pend) + t('avisos', 'bell', 'Avisos', avisos) + t('mas', 'menu', 'Más');
 }
 function abrirMenu() { document.body.classList.add('menu-abierto'); $('#btnMenu').setAttribute('aria-expanded', 'true'); $('#side a').focus(); }
 function cerrarMenu() { document.body.classList.remove('menu-abierto'); $('#btnMenu').setAttribute('aria-expanded', 'false'); }
 addEventListener('keydown', e => { if (e.key === 'Escape') cerrarMenu(); });
+matchMedia('(max-width:899px)').addEventListener('change', () => render());
 
 const VISTAS = {};
+VISTAS.mas = () => {
+  const fila = (k, i, t, d) => `<a class="lista-fila" href="#${k}"><span class="celda-pri persona" style="align-items:center"><span class="chip-ico">${ic(i)}</span><span style="min-width:0"><b>${t}</b><span class="sub">${d}</span></span></span><span class="sec">${ic('chevron')}</span></a>`;
+  return `<h1>Más</h1>
+  <div class="lista" style="--cols-m:minmax(0,1fr) auto;--cols:minmax(0,1fr) auto">
+    ${fila('contratos', 'file', 'Contratos', 'Arriendos y fichas')}
+    ${fila('revisiones', 'shield', 'Revisiones técnicas', 'Vencimientos de la flota')}
+    ${REAL ? fila('usuarios', 'users', 'Usuarios', 'Quién entra a la app') : ''}
+    ${fila('ajustes', 'sliders', 'Configuración', 'Empresa, contactos y alertas')}
+    ${REAL ? fila('mi-cuenta', 'user', 'Mi cuenta', esc((SESION && SESION.correo) || '')) : ''}
+  </div>
+  ${REAL ? '<button class="btn" style="width:100%" onclick="salir()">Cerrar sesión</button>' : ''}`;
+};
 function render() {
   let { r, arg, q } = leerRuta();
   if (!r) r = HOME[S.rol];
@@ -766,7 +820,9 @@ function render() {
   app.innerHTML = sinSesion ? vistaLogin() : VISTAS[r](arg, q);
   $('#btnMenu').hidden = !conSide;
   $('#campana').hidden = !conSide;
-  $('#btnVolver').hidden = sinSesion || (S.rol === 'dueno' && r === 'inicio'); // en el inicio del dueño no hay a dónde volver
+  // en el inicio no hay a dónde volver; en el celular, las pestañas tampoco lo necesitan
+  $('#btnVolver').hidden = sinSesion || (S.rol === 'dueno' && (r === 'inicio' || (enCelular() && (PESTAÑAS.includes(r) || r === 'mas'))));
+  $('#tabbar').hidden = !conSide;
   $('#marca').href = '#' + HOME[S.rol];
   if (conSide) pintarMenu(r);
   pintarRed();
@@ -842,7 +898,7 @@ VISTAS.inicio = () => {
   return `
   <div class="fecha-larga">${fechaLarga()}</div>
   <h1>${saludo()}${REAL && SESION && SESION.nombre ? ', ' + esc(SESION.nombre.split(' ')[0]) : ''}</h1>
-  <p>Tienes <b>${nCam(cs.length)}</b>: ${arr} ${arr === 1 ? 'arrendado' : 'arrendados'} y ${disp} ${disp === 1 ? 'disponible' : 'disponibles'}. ${items.length ? `Hay <b>${items.length === 1 ? '1 tema' : items.length + ' temas'} por revisar</b>.` : 'Todo está al día.'}</p>
+  <p class="no-movil">Tienes <b>${nCam(cs.length)}</b>: ${arr} ${arr === 1 ? 'arrendado' : 'arrendados'} y ${disp} ${disp === 1 ? 'disponible' : 'disponibles'}. ${items.length ? `Hay <b>${items.length === 1 ? '1 tema' : items.length + ' temas'} por revisar</b>.` : 'Todo está al día.'}</p>
   <div class="kpis">
     ${kpi('marca', cs.length, 'Flota total', 'truck', '#flota')}
     ${kpi('', arr, 'Arrendados', 'building', '#flota?f=arrendados')}
@@ -852,7 +908,7 @@ VISTAS.inicio = () => {
   <div class="grid-inicio">
     <section class="tarjeta">
       <div class="titulo-tarjeta"><h2>Requiere atención</h2>${items.length ? `<span class="chip urgente">${items.length} por revisar</span>` : ''}</div>
-      <p class="sec">Ordenado del más urgente al menos urgente.</p>
+      <p class="sec no-movil">Ordenado del más urgente al menos urgente.</p>
       <div>${items.length ? items.map(filaAtencion).join('') : '<div class="vacio">Nada pendiente. Todo al día.</div>'}</div>
     </section>
     <div>
