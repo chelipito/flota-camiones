@@ -286,9 +286,9 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <div class="migas" id="migas"></div>
     <span id="estadoRed" class="pill"></span>
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
-    <span class="avatar" id="avatar" aria-hidden="true"></span>
+    <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 18</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 19</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -556,7 +556,7 @@ async function entrar(ev) {
   btn.disabled = true; btn.textContent = 'Entrando…'; err.hidden = true;
   try {
     await pedirToken('password', { email: f.correo.value.trim(), password: f.clave.value });
-    FIRMA = ''; VERSION_NUBE = null;
+    FIRMA = ''; VERSION_NUBE = null; cargarPerfil();
     await traerLecturas();
     if (location.hash !== '#inicio') location.hash = '#inicio'; else render();
   } catch (e) {
@@ -686,10 +686,10 @@ const MENU = [
 ]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
 if (REAL) MENU.push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
 const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato: 'contratos', ficha: 'contratos', 'editar-contrato': 'contratos', 'editar-usuario': 'usuarios' };
-const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil']]);
+const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil'], ['mi-cuenta', 'Mi cuenta']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
-const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'editar-usuario', ...(REAL ? ['wsp'] : ['usuarios'])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
+const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'editar-usuario', ...(REAL ? ['wsp'] : ['usuarios', 'mi-cuenta'])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
 function permitido(rol, r) { return rol === 'dueno' ? !ESCONDIDAS.includes(r) : PERMISOS[rol].includes(r); }
 function leerRuta() {
   const [path, qs = ''] = location.hash.slice(1).split('?');
@@ -721,12 +721,15 @@ function pintarMenu(r) {
     ${MENU.map(item).join('')}
     <div class="abajo">
       ${item(['ajustes', 'sliders', 'Configuración'])}
+      ${REAL ? item(['mi-cuenta', 'user', 'Mi cuenta']) : ''}
     </div>`;
   const n = avisos;
   const camp = $('#campana');
   camp.innerHTML = ic('bell') + (n ? `<span class="contador">${n}</span>` : '');
   camp.setAttribute('aria-label', `Avisos: ${n} por revisar`);
-  $('#avatar').innerHTML = ic('user');
+  const ini = REAL && SESION && SESION.nombre ? iniciales(SESION.nombre) : '';
+  $('#avatar').innerHTML = ini || ic('user');
+  $('#avatar').href = REAL ? '#mi-cuenta' : '#ajustes';
   $('#migas').innerHTML = `<span class="seccion-marca">FLOTA</span><span aria-hidden="true">›</span><span>${esc(TITULO[base] || '')}</span>`;
 }
 function abrirMenu() { document.body.classList.add('menu-abierto'); $('#btnMenu').setAttribute('aria-expanded', 'true'); $('#side a').focus(); }
@@ -821,7 +824,7 @@ VISTAS.inicio = () => {
   const ocup = cs.length ? Math.round(arr / cs.length * 100) : 0;
   return `
   <div class="fecha-larga">${fechaLarga()}</div>
-  <h1>${saludo()}</h1>
+  <h1>${saludo()}${REAL && SESION && SESION.nombre ? ', ' + esc(SESION.nombre.split(' ')[0]) : ''}</h1>
   <p>Tienes <b>${nCam(cs.length)}</b>: ${arr} ${arr === 1 ? 'arrendado' : 'arrendados'} y ${disp} ${disp === 1 ? 'disponible' : 'disponibles'}. ${items.length ? `Hay <b>${items.length === 1 ? '1 tema' : items.length + ' temas'} por revisar</b>.` : 'Todo está al día.'}</p>
   <div class="kpis">
     ${kpi('marca', cs.length, 'Flota total', 'truck', '#flota')}
@@ -1381,6 +1384,62 @@ function quitarUsuario(id) {
   guardar(); toast('Usuario quitado'); ir('usuarios');
 }
 
+/* ============ Mi cuenta (Supabase Auth: /auth/v1/user) ============ */
+async function cuentaAuth(metodo, cuerpo) {
+  if (!(await sesionVigente())) { sesionPerdida(); throw new Error('sesión'); }
+  const res = await fetch(`${SUPA_URL}/auth/v1/user`, { method: metodo, headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const m = d.msg || d.error_description || d.message || 'Error ' + res.status;
+    throw new Error(/different from the old/i.test(m) ? 'La contraseña nueva debe ser distinta de la actual' : /at least/i.test(m) ? 'La contraseña es muy corta' : /reauthentication/i.test(m) ? 'Por seguridad, cierra sesión, vuelve a entrar e inténtalo de nuevo' : m);
+  }
+  return d;
+}
+async function cargarPerfil() { // trae nombre y teléfono guardados en la cuenta
+  try {
+    const u = await cuentaAuth('GET'), m = u.user_metadata || {};
+    guardarSesion({ ...SESION, nombre: m.nombre || '', telefono: m.telefono || '', correo: u.email || SESION.correo });
+    if (leerRuta().r === 'mi-cuenta' && !['INPUT'].includes(document.activeElement && document.activeElement.tagName)) render();
+    else if (SESION.nombre) $('#avatar').innerHTML = iniciales(SESION.nombre);
+  } catch (e) { /* sin conexión: se queda con lo que había */ }
+}
+VISTAS['mi-cuenta'] = () => {
+  if (SESION && SESION.nombre === undefined) setTimeout(cargarPerfil);
+  const yo = SESION || {};
+  return `<h1>Mi cuenta</h1>
+  <form class="tarjeta" onsubmit="guardarPerfil(event)">
+    <div class="titulo-tarjeta"><h2>Mis datos</h2><span class="avatar">${yo.nombre ? iniciales(yo.nombre) : ic('user')}</span></div>
+    <label class="campo">Correo <span class="ayuda">(con este correo entras a la app)</span><input value="${esc(yo.correo || '')}" readonly></label>
+    <label class="campo">Nombre<input name="nombre" value="${esc(yo.nombre || '')}" autocomplete="name" placeholder="Tu nombre"></label>
+    <label class="campo">Teléfono<input name="telefono" type="tel" value="${esc(yo.telefono || '')}" autocomplete="tel" placeholder="+56 9 1234 5678"></label>
+    <button class="btn pri">Guardar mis datos</button>
+  </form>
+  <form class="tarjeta" onsubmit="cambiarClave(event)">
+    <h2>Cambiar contraseña</h2>
+    <label class="campo">Contraseña nueva <span class="ayuda">(mínimo 8 caracteres)</span><input name="clave" type="password" minlength="8" required autocomplete="new-password"></label>
+    <label class="campo">Repite la contraseña nueva<input name="clave2" type="password" minlength="8" required autocomplete="new-password"></label>
+    <button class="btn">Cambiar contraseña</button>
+  </form>
+  <div class="tarjeta"><h2>Sesión</h2><p class="sec">Al cerrar sesión, en este equipo se vuelve a pedir el correo y la contraseña.</p>
+    <button class="btn" onclick="salir()">Cerrar sesión</button></div>`;
+};
+async function guardarPerfil(ev) {
+  ev.preventDefault();
+  const f = ev.target, btn = f.querySelector('button'), nombre = f.nombre.value.trim(), telefono = f.telefono.value.trim();
+  btn.disabled = true;
+  try { await cuentaAuth('PUT', { data: { nombre, telefono } }); guardarSesion({ ...SESION, nombre, telefono }); toast('Tus datos quedaron guardados'); render(); }
+  catch (e) { if (e.message !== 'sesión') toast('No se pudo guardar: ' + e.message); btn.disabled = false; }
+}
+async function cambiarClave(ev) {
+  ev.preventDefault();
+  const f = ev.target, btn = f.querySelector('button');
+  if (f.clave.value !== f.clave2.value) { toast('Las dos contraseñas no coinciden'); return; }
+  btn.disabled = true;
+  try { await cuentaAuth('PUT', { password: f.clave.value }); f.reset(); toast('Contraseña cambiada. Úsala la próxima vez que entres.'); }
+  catch (e) { if (e.message !== 'sesión') toast('No se pudo cambiar: ' + e.message); }
+  btn.disabled = false;
+}
+
 /* ============ Usuarios reales (función "usuarios" de Supabase) ============ */
 let CUENTAS = null;
 async function llamarUsuarios(metodo, extra = '', cuerpo) {
@@ -1402,7 +1461,7 @@ function htmlCuentas() {
   return `<div class="lista" style="--cols:minmax(0,2fr) minmax(0,1.2fr) auto">
     <div class="lista-cab"><span>Correo</span><span>Último ingreso</span><span></span></div>
     ${CUENTAS.map(u => `<div class="lista-fila">
-      <span class="celda-pri"><b>${esc(u.correo)}</b>${u.correo === yo ? '<span class="sub">Tú</span>' : ''}<span class="sub solo-movil">${u.ultimo ? 'Entró ' + cuando(Date.parse(u.ultimo)) : 'Nunca ha entrado'}</span></span>
+      <span class="celda-pri"><b>${esc(u.nombre || u.correo)}</b>${u.nombre ? `<span class="sub">${esc(u.correo)}</span>` : ''}${u.correo === yo ? '<span class="sub">Tú</span>' : ''}<span class="sub solo-movil">${u.ultimo ? 'Entró ' + cuando(Date.parse(u.ultimo)) : 'Nunca ha entrado'}</span></span>
       <span class="opc">${u.ultimo ? cuando(Date.parse(u.ultimo)) : 'Nunca ha entrado'}</span>
       ${u.correo === yo ? '<span></span>' : `<button class="btn chico" onclick="quitarCuenta('${u.id}','${esc(u.correo)}')">Quitar acceso</button>`}
     </div>`).join('')}</div>`;
@@ -1852,7 +1911,7 @@ function exportarCSV() {
 }
 
 render();
-if (REAL) { traerLecturas(); setInterval(traerLecturas, 10000); } // cada 10 segundos revisa si llegó algo por WhatsApp
+if (REAL) { traerLecturas(); setInterval(traerLecturas, 10000); if (SESION) cargarPerfil(); } // cada 10 segundos revisa si llegó algo por WhatsApp
 </script>
 </body>
 </html>

@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (req.method === 'GET') {
     const { data, error } = await admin.auth.admin.listUsers({ perPage: 100 });
     if (error) return json({ error: error.message }, 500);
-    return json(data.users.map((u) => ({ id: u.id, correo: u.email, creado: u.created_at, ultimo: u.last_sign_in_at })));
+    return json(data.users.map((u) => ({ id: u.id, correo: u.email, nombre: u.user_metadata?.nombre ?? '', creado: u.created_at, ultimo: u.last_sign_in_at })));
   }
 
   // Crear un usuario (queda confirmado: puede entrar al tiro)
