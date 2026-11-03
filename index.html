@@ -417,15 +417,16 @@ function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } cat
 
 /* ============ Registro real por WhatsApp (Supabase) ============ */
 // Datos del proyecto de Supabase. La clave pública (anon) solo permite leer: lo define supabase/esquema.sql
-const SUPA_URL = '';
-const SUPA_KEY = '';
+const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
+const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública: solo lectura
 const WSP_NUMERO = ''; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 let FIRMA = '', ULTIMO_ID = null;
 async function traerLecturas() {
   try {
-    const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } });
+    // la clave nueva (sb_publishable_) va solo en apikey; la antigua (eyJ...) también en Authorization
+    const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: { apikey: SUPA_KEY, ...(SUPA_KEY.startsWith('eyJ') ? { Authorization: 'Bearer ' + SUPA_KEY } : {}) } });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const filas = await res.json();
     $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : '');
