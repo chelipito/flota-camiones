@@ -293,7 +293,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 21</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 22</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -1585,9 +1585,11 @@ function ajustesAlertas(cfg) {
 // Ejemplos con los números que el dueño está escribiendo (se actualizan mientras escribe)
 function pintarEjemplos(c) {
   const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = '<span class="t">Ejemplo</span>' + html; };
-  pon('reg', c.validarSalto
-    ? `El último registro fue <b>7.450 h</b>, hace <b>2 horas</b>.<br>Si alguien manda <b>7.540</b> (un dedazo por 7.454), se rechaza: el motor no puede haber trabajado 90 horas en 2.<br>Con <b>7.452</b> se acepta.`
-    : `<b>Apagada:</b> se acepta cualquier número igual o mayor al anterior.<br>Si alguien manda <b>7.540</b> en vez de 7.454, se guarda tal cual y los cálculos de mantención quedan corridos.<br>Actívala para evitarlo.`);
+  pon('reg', `Ayer a las 18:00 el camión marcaba <b>7.450 h</b>.<br>
+    Hoy a las 8:00 (pasaron <b>14 horas</b>) el empleado quiere enviar <b>7.454</b>, pero se equivoca y escribe <b>7.540</b>.<br><br>
+    <b>Con la regla activada:</b> ❌ se rechaza, porque en 14 horas el motor no pudo trabajar 90 horas. El empleado revisa y lo corrige.<br>
+    <b>Con la regla apagada:</b> ⚠️ se guarda 7.540 y la próxima mantención se calcula mal.<br><br>
+    Ahora está: <b>${c.validarSalto ? 'ACTIVADA ✅' : 'APAGADA'}</b>`);
   const iv = c.intervaloMant || 250, base = 7250, prox = base + iv;
   pon('mant', `La última mantención fue a las <b>${n0(base)} h</b>, así que la próxima es a las <b>${n0(prox)} h</b>.<br>
     🟡 Al llegar a <b>${n0(prox - c.horasMantAviso)} h</b> te llega: "faltan ${n0(c.horasMantAviso)} h para la mantención".<br>
