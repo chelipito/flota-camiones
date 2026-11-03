@@ -419,7 +419,7 @@ function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } cat
 // Datos del proyecto de Supabase. La clave pública (anon) solo permite leer: lo define supabase/esquema.sql
 const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública: solo lectura
-const WSP_NUMERO = ''; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
+const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 let FIRMA = '', ULTIMO_ID = null;

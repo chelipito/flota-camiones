@@ -32,7 +32,7 @@ function leerMensaje(txt: string) {
 
 async function responder(a: string, texto: string) {
   if (!TOKEN || !PHONE_ID) return;
-  const r = await fetch(`https://graph.facebook.com/v21.0/${PHONE_ID}/messages`, {
+  const r = await fetch(`https://graph.facebook.com/v25.0/${PHONE_ID}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'text', text: { body: texto } }),
