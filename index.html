@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 14</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 15</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -893,8 +893,7 @@ VISTAS.camion = id => {
     <section class="tarjeta borde-${rt.e}">
       <h2>Revisión técnica</h2>
       <p style="margin:0">Vence el <b>${fecha(dISO(c.rtVence))}</b></p>
-      <div class="chips" style="margin:.5rem 0 .75rem">${chip(rt.e, rt.txt)}</div>
-      <a class="btn chico" href="#" onclick="toast('En la versión real aquí se abre el certificado (PDF o foto).');return false">${ic('file')}Ver certificado</a>
+      <div class="chips" style="margin:.5rem 0 0">${chip(rt.e, rt.txt)}</div>
     </section>
     <section class="tarjeta borde-${h.e}">
       <h2>Horómetro</h2>
