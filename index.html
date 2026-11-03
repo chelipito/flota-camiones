@@ -282,6 +282,31 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 /* Celular (dueño), estilo tipo Facebook: nombre grande arriba con botones redondos, tarjetas de borde a borde,
    pestañas abajo con línea en la activa y "Más" con accesos en cuadrícula. Mismo contenido que en el computador. */
 .tabbar{display:none}
+.solo-cel{display:none}
+/* Tarjetas de camión en 2 columnas (celular) */
+.grilla-camiones{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.cam-card{background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(15,23,42,.08);text-decoration:none;color:inherit;display:flex;flex-direction:column;overflow:hidden}
+.cam-card .foto{background:#F1F5F9;height:78px;display:grid;place-items:center;position:relative;color:#475569}
+.cam-card .foto .ico{width:34px;height:34px}
+.cam-card .foto .punto{position:absolute;top:8px;right:8px;width:10px;height:10px;border-radius:50%;background:var(--ok-t)}
+.cam-card .foto .punto.porvencer{background:#C2410C} .cam-card .foto .punto.urgente,.cam-card .foto .punto.vencido{background:#B91C1C} .cam-card .foto .punto.sinreporte{background:#94A3B8}
+.cam-card .info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.cam-card .info b{font-family:Lexend;font-size:1rem}
+.cam-card .info .sub{font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cam-card .info .estado{font-size:.8rem;white-space:normal;margin-top:4px;align-items:flex-start}
+.cam-card .info .estado::before{margin-top:.35em}
+.pildoras{display:flex;gap:8px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px}
+.pildoras a{flex:none;padding:.45rem .95rem;border-radius:999px;background:#fff;color:#334155;text-decoration:none;font-weight:600;font-size:.88rem;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+.pildoras a[aria-pressed="true"]{background:#111;color:#fff}
+.buscador{display:flex;align-items:center;gap:8px;background:#fff;border-radius:12px;padding:0 12px;box-shadow:0 1px 3px rgba(15,23,42,.08);margin-bottom:12px}
+.buscador .ico{color:#64748B}
+.buscador input{flex:1;min-width:0;border:0;outline:0;background:transparent;min-height:44px;font-size:16px}
+.titulo-seccion{display:flex;justify-content:space-between;align-items:baseline;margin:4px 0 8px}
+.titulo-seccion h2{margin:0}
+.titulo-seccion a{font-weight:600;font-size:.9rem;color:#111}
+.perfil-centro{text-align:center;padding:20px 16px}
+.perfil-centro .avatar{width:72px;height:72px;font-size:1.4rem;margin:0 auto 10px}
+.perfil-centro b{display:block;font-size:1.05rem}
 @media (max-width:899px){
   body.con-side{--top-bg:#FFFFFF;--top-fg:#111111;--top-btn:#E4E6EB;--fondo:#E9EBEE;font-size:15px}
   body.con-side .top{min-height:56px;padding:.35rem 12px;border-bottom:1px solid #DADDE1}
@@ -301,10 +326,15 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
   body.con-side main{padding:12px 12px calc(84px + env(safe-area-inset-bottom))}
   body.con-side h1{font-size:1.3rem}
   body.con-side h2{font-size:1.05rem}
-  /* tarjetas y listas de borde a borde, separadas por franjas grises */
-  body.con-side .tarjeta,body.con-side .lista{margin-left:-12px;margin-right:-12px;border-radius:0;border-left:0;border-right:0;margin-bottom:8px}
-  body.con-side .tarjeta{padding:14px 16px}
-  body.con-side .grid,body.con-side .grid-inicio{gap:0}
+  /* tarjetas redondeadas y separadas; cada fila de una lista es su propio cuadro */
+  body.con-side{--fondo:#F2F3F5}
+  body.con-side .tarjeta{border:0;border-radius:16px;box-shadow:0 1px 3px rgba(15,23,42,.08);padding:14px 16px;margin-bottom:12px}
+  body.con-side .grid,body.con-side .grid-inicio{gap:12px}
+  body.con-side .lista{background:transparent;border:0;overflow:visible;display:grid;gap:8px}
+  body.con-side .lista-fila{background:#fff;border:0;border-radius:14px;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+  body.con-side .kpi{border:0;box-shadow:0 1px 3px rgba(15,23,42,.08)}
+  body.con-side .solo-pc{display:none !important}
+  body.con-side .solo-cel{display:block}
   body.con-side .btn{min-height:44px;padding:.5rem .9rem}
   body.con-side .btn.chico{min-height:38px;padding:.3rem .7rem;font-size:.9rem}
   body.con-side .lista-fila{padding:11px 16px}
@@ -343,7 +373,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 29</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 30</div>
   <main id="app"></main>
   <nav class="tabbar no-print" id="tabbar" aria-label="Navegación principal"></nav>
 </div>
@@ -352,6 +382,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 <!-- Iconos (estilo Lucide) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
@@ -703,6 +734,18 @@ function motivo(c) {
   if (xs.length) return { e: xs[0].e, txt: xs[0].txt + (xs.length > 1 ? ` y ${xs.length - 1} más` : '') };
   return sr.si ? { e: 'sinreporte', txt: `Sin reporte hace ${sr.dias} días` } : { e: 'ok', txt: 'Al día' };
 }
+// Tarjeta de camión para la cuadrícula del celular (la búsqueda ignora tildes y mayúsculas)
+const sinTildes = t => String(t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+function tarjetaCamion(c) {
+  const k = contrato(c.contratoId), mo = motivo(c);
+  return `<a class="cam-card" href="#camion/${c.id}" data-buscar="${esc(sinTildes(c.patente + ' ' + c.tipo + ' ' + (c.modelo || '') + ' ' + (k ? k.empresa : '')))}">
+    <span class="foto">${ic('truck')}<span class="punto ${mo.e}"></span></span>
+    <span class="info"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)} · ${k ? esc(k.empresa) : 'Disponible'}</span>${estado(mo.e, mo.txt)}</span></a>`;
+}
+function filtrarCamiones(txt) {
+  const q = sinTildes(txt.trim()).replace(/[^a-z0-9 ]/g, '');
+  document.querySelectorAll('.grilla-camiones .cam-card').forEach(a => { a.hidden = q && !a.dataset.buscar.includes(q); });
+}
 const ordenUrgencia = (a, b) => RANGO[estadoGeneral(b)] - RANGO[estadoGeneral(a)] || estadoRT(a).d - estadoRT(b).d;
 const porValidar = () => S.camiones.reduce((s, c) => s + lecturasOk(c).filter(l => l.estado === 'pendiente').length, 0);
 
@@ -821,8 +864,8 @@ VISTAS.mas = () => {
   const yo = SESION || {}, avisos = itemsAtencion().length;
   const acceso = (k, i, t, color, n) => `<a href="#${k}"><span style="color:${color}">${ic(i)}</span><b>${t}</b>${n ? `<span class="badge">${n}</span>` : ''}</a>`;
   return `<h1>Menú</h1>
-  ${REAL ? `<a class="tarjeta menu-perfil" href="#mi-cuenta"><span class="avatar">${yo.nombre ? iniciales(yo.nombre) : ic('user')}</span>
-    <span style="min-width:0"><b>${esc(yo.nombre || yo.correo || 'Mi cuenta')}</b><span class="sub">Ver mi cuenta</span></span></a>` : ''}
+  ${REAL ? `<a class="tarjeta perfil-centro menu-perfil" style="flex-direction:column;gap:0" href="#mi-cuenta"><span class="avatar">${yo.nombre ? iniciales(yo.nombre) : ic('user')}</span>
+    <b>${esc(yo.nombre || 'Mi cuenta')}</b><span class="sub">${esc(yo.correo || '')}</span><span class="sub" style="margin-top:6px;font-weight:600;color:#111">Ver mi cuenta ›</span></a>` : ''}
   <div class="menu-grilla">
     ${acceso('avisos', 'bell', 'Avisos', '#DC2626', avisos)}
     ${acceso('contratos', 'file', 'Contratos', '#2563EB')}
@@ -930,6 +973,10 @@ VISTAS.inicio = () => {
     ${kpi('', disp, 'Disponibles', 'check', '#flota?f=disponibles')}
     ${kpi(items.length ? 'urgente' : 'ok', items.length, 'Por revisar', items.length ? 'alert' : 'check', '#avisos')}
   </div>
+  <div class="solo-cel">
+    <div class="titulo-seccion"><h2>Tu flota</h2><a href="#flota">Ver todos →</a></div>
+    <div class="grilla-camiones">${cs.slice().sort(ordenUrgencia).slice(0, 4).map(tarjetaCamion).join('')}</div>
+  </div>
   <div class="grid-inicio">
     <section class="tarjeta">
       <div class="titulo-tarjeta"><h2>Requiere atención</h2>${items.length ? `<span class="chip urgente">${items.length} por revisar</span>` : ''}</div>
@@ -960,6 +1007,14 @@ VISTAS.flota = (_, q) => {
   return `
   <div class="cab"><div><h1>Flota</h1><p class="sec" style="margin:0">Todos tus camiones, arrendados y disponibles.</p></div>
     <div class="acciones no-print"><a class="btn chico cta" href="#editar/nuevo">${ic('plus')}Agregar camión</a><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
+  <div class="solo-cel">
+    <label class="buscador">${ic('search')}<input type="search" placeholder="Buscar patente, tipo o empresa" oninput="filtrarCamiones(this.value)" aria-label="Buscar camión"></label>
+    <nav class="pildoras" aria-label="Filtrar la flota">
+      <a href="#flota?f=todos" aria-pressed="${f === 'todos'}">Todos (${cs.length})</a><a href="#flota?f=arrendados" aria-pressed="${f === 'arrendados'}">Arrendados (${arr.length})</a><a href="#flota?f=disponibles" aria-pressed="${f === 'disponibles'}">Disponibles (${cs.length - arr.length})</a>
+    </nav>
+    ${lista.length ? `<div class="grilla-camiones">${lista.map(tarjetaCamion).join('')}</div>` : '<div class="tarjeta vacio">No hay camiones en este grupo.</div>'}
+  </div>
+  <div class="solo-pc">
   <div class="kpis k3" role="group" aria-label="Filtrar la flota">
     ${filtro('todos', cs.length, 'Todos', 'truck')}${filtro('arrendados', arr.length, 'Arrendados', 'building')}${filtro('disponibles', cs.length - arr.length, 'Disponibles', 'check')}
   </div>
@@ -972,7 +1027,8 @@ VISTAS.flota = (_, q) => {
       <span class="opc">${estado(m.e, m.txt)}<span class="sub">próxima a las ${n0(m.prox)} h</span></span>
       <span class="solo-movil-bloque">${estado(mo.e, mo.txt)}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
-  </div>` : '<div class="tarjeta vacio">No hay camiones en este grupo.</div>'}`;
+  </div>` : '<div class="tarjeta vacio">No hay camiones en este grupo.</div>'}
+  </div>`;
 };
 
 /* ============ Dueño: Detalle de camión ============ */
