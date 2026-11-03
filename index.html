@@ -293,7 +293,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 25</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 26</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -347,7 +347,8 @@ const fecha = d => new Date(d).toLocaleDateString('es-CL', { day: '2-digit', mon
 const fechaCorta = d => new Date(d).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit' });
 const hora = d => new Date(d).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
 const diasHasta = d => Math.round((new Date(d).setHours(0, 0, 0, 0) - hoy0()) / DIA);
-const fmtPatente = p => String(p).toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]{2})([A-Z0-9]{2})([0-9]{2})$/, '$1·$2·$3');
+// Patentes chilenas: HKTZ48 → HK·TZ·48 y AB1234 → AB·12·34; cualquier otra se muestra tal cual
+const fmtPatente = p => String(p).toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]{2})([A-Z]{2}|[0-9]{2})([0-9]{2})$/, '$1·$2·$3');
 const iniciales = n => String(n).split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
 const primerNombre = n => String(n).split(' ')[0];
 function fechaLarga() { const s = new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }); return s[0].toUpperCase() + s.slice(1); }
@@ -640,6 +641,17 @@ function estadoGeneral(c) {
   if (e === 'ok' && sinReporte(c).si) e = 'sinreporte';
   return e;
 }
+// Lo más urgente de un camión, dicho en corto (p. ej. "Mantención: faltan 48 h")
+function motivo(c) {
+  const rt = estadoRT(c), m = estadoMant(c), h = estadoHoras(c), sr = sinReporte(c);
+  const xs = [
+    { e: m.e, txt: m.resta > 0 ? `Mantención: faltan ${n0(m.resta)} h` : `Mantención atrasada ${n0(-m.resta)} h` },
+    { e: rt.e, txt: rt.d < 0 ? 'Rev. técnica vencida' : rt.d === 0 ? 'Rev. técnica vence hoy' : `Rev. técnica en ${rt.d} ${rt.d === 1 ? 'día' : 'días'}` },
+    { e: h.e, txt: h.pct >= 100 ? 'Límite de horas superado' : `Horas: ${Math.floor(h.pct)}% del límite` },
+  ].filter(x => x.e !== 'ok').sort((a, b) => RANGO[b.e] - RANGO[a.e]);
+  if (xs.length) return { e: xs[0].e, txt: xs[0].txt + (xs.length > 1 ? ` y ${xs.length - 1} más` : '') };
+  return sr.si ? { e: 'sinreporte', txt: `Sin reporte hace ${sr.dias} días` } : { e: 'ok', txt: 'Al día' };
+}
 const ordenUrgencia = (a, b) => RANGO[estadoGeneral(b)] - RANGO[estadoGeneral(a)] || estadoRT(a).d - estadoRT(b).d;
 const porValidar = () => S.camiones.reduce((s, c) => s + lecturasOk(c).filter(l => l.estado === 'pendiente').length, 0);
 
@@ -871,13 +883,13 @@ VISTAS.flota = (_, q) => {
     ${filtro('todos', cs.length, 'Todos', 'truck')}${filtro('arrendados', arr.length, 'Arrendados', 'building')}${filtro('disponibles', cs.length - arr.length, 'Disponibles', 'check')}
   </div>
   ${lista.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.8fr) minmax(0,1.4fr) minmax(0,1.2fr) 24px">
-    <div class="lista-cab"><span>Camión</span><span>Arriendo</span><span>Rev. técnica</span><span>Horómetro</span><span></span></div>
-    ${lista.map(c => { const k = contrato(c.contratoId), rt = estadoRT(c), h = estadoHoras(c), g = estadoGeneral(c); return `<a class="lista-fila" href="#camion/${c.id}">
+    <div class="lista-cab"><span>Camión</span><span>Arriendo</span><span>Rev. técnica</span><span>Mantención</span><span></span></div>
+    ${lista.map(c => { const k = contrato(c.contratoId), rt = estadoRT(c), m = estadoMant(c), mo = motivo(c); return `<a class="lista-fila" href="#camion/${c.id}">
       <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${k ? esc(k.empresa) : 'Disponible'}</span></span></span>
       <span class="opc">${k ? `${esc(k.empresa)}<span class="sub">hasta ${fecha(dISO(k.termino))}</span>` : '<span class="sec">Disponible</span>'}</span>
       <span class="opc">${estado(rt.e, rt.txt)}</span>
-      <span class="opc">${estado(h.e, h.txt)}</span>
-      <span class="solo-movil-bloque">${estado(g, ETQ[g])}</span>
+      <span class="opc">${estado(m.e, m.txt)}<span class="sub">próxima a las ${n0(m.prox)} h</span></span>
+      <span class="solo-movil-bloque">${estado(mo.e, mo.txt)}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
   </div>` : '<div class="tarjeta vacio">No hay camiones en este grupo.</div>'}`;
 };
@@ -894,7 +906,7 @@ VISTAS.camion = id => {
   const ec = k && estadoContrato(k);
   return `
   <div class="cab"><div><h1 class="patente">${fmtPatente(c.patente)}</h1><p class="sec" style="margin:0">${esc(c.tipo)} · ${esc(c.modelo)}</p></div>
-    <div class="chips">${chipArriendo(c)}${chip(estadoGeneral(c), ETQ[estadoGeneral(c)])}</div></div>
+    <div class="chips">${chipArriendo(c)}${chip(motivo(c).e, motivo(c).txt)}</div></div>
   ${k ? `<section class="tarjeta borde-${ec.e}">
       <div class="titulo-tarjeta"><h2>Arrendado a ${esc(k.empresa)}</h2>${chip(ec.e, ec.txt)}</div>
       <dl class="dl"><dt>Contrato</dt><dd>${esc(k.numero)}</dd><dt>Vigencia</dt><dd>${fecha(dISO(k.inicio))} al ${fecha(dISO(k.termino))}</dd><dt>Faena</dt><dd>${esc(k.faena)}</dd>
@@ -1964,7 +1976,7 @@ function exportarCSV() {
   const cab = ['Patente', 'Tipo', 'Modelo', 'Estado arriendo', 'Empresa', 'Contrato vence', 'Horómetro actual', 'Límite horas', '% usado', 'Promedio h/día', 'Fecha límite aprox.', 'Vence rev. técnica', 'Días restantes RT', 'Próxima mantención (h)', 'Horas para mantención', 'Último reporte', 'Estado'];
   const filas = S.camiones.slice().sort(ordenUrgencia).map(c => {
     const h = estadoHoras(c), rt = estadoRT(c), u = ultima(c), k = contrato(c.contratoId);
-    return [fmtPatente(c.patente), c.tipo, c.modelo, k ? 'Arrendado' : 'Disponible', k ? k.empresa : '', k ? fecha(dISO(k.termino)) : '', n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fecha(dISO(c.rtVence)), rt.d, estadoMant(c).prox, n0(estadoMant(c).resta), u ? fecha(u.fecha) : '', ETQ[estadoGeneral(c)]];
+    return [fmtPatente(c.patente), c.tipo, c.modelo, k ? 'Arrendado' : 'Disponible', k ? k.empresa : '', k ? fecha(dISO(k.termino)) : '', n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fecha(dISO(c.rtVence)), rt.d, estadoMant(c).prox, n0(estadoMant(c).resta), u ? fecha(u.fecha) : '', motivo(c).e === 'ok' ? 'Al día' : `${ETQ[motivo(c).e]}: ${motivo(c).txt}`];
   });
   const csv = '﻿' + [cab, ...filas].map(f => f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const a = document.createElement('a');
