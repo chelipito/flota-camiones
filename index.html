@@ -224,7 +224,9 @@ th{color:var(--texto-2);font-weight:600}
 .etiqueta-canal{display:inline-block;font-size:.8rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;background:var(--ok-f, #ecfdf5);color:var(--ok-t, #065f46);margin-left:6px;vertical-align:middle}
 .etiqueta-canal.app{background:#f1f5f9;color:#475569}
 .fila-contacto{display:flex;gap:8px;margin-bottom:8px}
-.fila-contacto input{flex:1;min-width:0}
+.fila-contacto input:not([type=checkbox]){flex:1;min-width:0}
+.fila-contacto input[type=checkbox]{width:22px;height:22px;flex:none;align-self:center;accent-color:#111;cursor:pointer}
+.fila-contacto.pausado input:not([type=checkbox]){opacity:.5}
 .filtros .btn{flex:none}
 .filtros .btn[aria-pressed="true"]{background:var(--primario);color:#fff}
 .graf{display:flex;align-items:flex-end;gap:4px;height:90px;margin-top:8px}
@@ -341,7 +343,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 28</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 29</div>
   <main id="app"></main>
   <nav class="tabbar no-print" id="tabbar" aria-label="Navegación principal"></nav>
 </div>
@@ -1403,7 +1405,7 @@ function tarjetaAvisosAuto() {
       <p class="sec">${cfg.avisoInmediato ? 'Aviso al momento cuando algo pasa a por vencer, urgente o atrasado (una vez por etapa).' : 'Aviso al momento: apagado.'}
         ${cfg.resumenFrec === 'diario' ? `Resumen todos los días a las ${hh(cfg.horaAvisos)}.` : cfg.resumenFrec === 'semanal' ? `Resumen cada ${['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'][cfg.resumenDia]} a las ${hh(cfg.horaAvisos)}.` : 'Sin resumen.'}
         <a href="#ajustes?tab=alertas">Cambiar</a></p>
-      ${cfg.wsp ? `<p>Se envían a: <b>${listaContactos(cfg.wsp).map(esc).join(', ')}</b> · <a href="#ajustes">cambiar</a></p>` : `<div class="error" role="alert">Falta el número que recibe los avisos. Agrégalo en <a href="#ajustes">Configuración → Empresa y contactos</a>.</div>`}
+      ${cfg.wsp ? `<p>Se envían a: <b>${listaContactos(cfg.wsp).map(esc).join(', ')}</b> · <a href="#ajustes">cambiar</a></p>` : `<div class="error" role="alert">No hay números activos para recibir los avisos. Revísalo en <a href="#ajustes">Configuración → Empresa y contactos</a>.</div>`}
       <div class="acciones no-print"><button class="btn" onclick="avisoPrueba(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('send')}Enviar aviso de prueba</button>
         <button class="btn" onclick="revisarTodo(this)" ${cfg.wsp ? '' : 'disabled'}>${ic('bell')}Revisar ahora</button></div>
       <h3 style="margin-top:16px">Últimos avisos enviados</h3>
@@ -1609,14 +1611,19 @@ VISTAS.ajustes = (_, q) => {
   <nav class="filtros no-print" aria-label="Secciones de configuración">${pestaña('empresa', 'Empresa y contactos')}${pestaña('alertas', 'Alertas')}</nav>
   ${tab === 'empresa' ? ajustesEmpresa(cfg) : ajustesAlertas(cfg)}`;
 };
-const filaContacto = (tipo, v = '') => `<div class="fila-contacto"><input name="${tipo}" type="${tipo === 'wsp' ? 'tel' : 'email'}" value="${esc(v)}"
+const filaContacto = (tipo, v = '', on = true) => `<div class="fila-contacto ${on ? '' : 'pausado'}">
+  <input type="checkbox" ${on ? 'checked' : ''} aria-label="Activo" title="Marcado: activo · Desmarcado: pausado" onchange="this.parentElement.classList.toggle('pausado', !this.checked)">
+  <input name="${tipo}" type="${tipo === 'wsp' ? 'tel' : 'email'}" value="${esc(v)}"
   placeholder="${tipo === 'wsp' ? '+56 9 1234 5678' : 'nombre@empresa.cl'}" aria-label="${tipo === 'wsp' ? 'WhatsApp' : 'Correo'}" autocomplete="off">
   <button type="button" class="btn chico" onclick="this.parentElement.remove()" aria-label="Quitar">Quitar</button></div>`;
 function agregarContacto(tipo) {
   const caja = $('#lista-' + tipo); caja.insertAdjacentHTML('beforeend', filaContacto(tipo)); caja.lastElementChild.querySelector('input').focus();
 }
 function ajustesEmpresa(cfg) {
-  const lista = tipo => (listaContactos(cfg[tipo]).length ? listaContactos(cfg[tipo]) : ['']).map(v => filaContacto(tipo, v)).join('');
+  const lista = tipo => {
+    const xs = cfg[tipo + 'Lista'] || listaContactos(cfg[tipo]).map(v => ({ v, on: true }));
+    return (xs.length ? xs : [{ v: '', on: true }]).map(x => filaContacto(tipo, x.v, x.on)).join('');
+  };
   return `<form class="tarjeta" onsubmit="guardarEmpresa(event)">
     <h2>Datos de la empresa</h2>
     <div class="grid grid-2">
@@ -1624,11 +1631,11 @@ function ajustesEmpresa(cfg) {
       <label class="campo">Teléfono de contacto<input name="telefono" type="tel" value="${esc(cfg.telefono)}"></label>
     </div>
     <h2 style="margin-top:8px">WhatsApp que reciben las alertas <span class="etiqueta-canal">Automático</span></h2>
-    <p class="sec">A cada número le llega el aviso de mantención y del horómetro. Escríbelo con código de país.${REAL ? ' Mientras se use el número de prueba de Meta, cada número debe estar también en la lista "Para" de Meta.' : ''}</p>
+    <p class="sec">☑ Marcado: recibe los avisos. ☐ Desmarcado: queda pausado, sin borrarlo. Escribe el número con código de país.${REAL ? ' Mientras se use el número de prueba de Meta, cada número debe estar también en la lista "Para" de Meta.' : ''}</p>
     <div id="lista-wsp">${lista('wsp')}</div>
     <button type="button" class="btn chico" onclick="agregarContacto('wsp')">${ic('plus')}Agregar otro número</button>
     <h2 style="margin-top:16px">Correos <span class="etiqueta-canal app">Envío manual</span></h2>
-    <p class="sec">Se usan en <a href="#avisos">Avisos</a> → "Correo" para mandar el resumen. El envío automático por correo aún no está disponible.</p>
+    <p class="sec">☑ Marcado: se usa en <a href="#avisos">Avisos</a> → "Correo" para mandar el resumen. El envío automático por correo aún no está disponible.</p>
     <div id="lista-correo">${lista('correo')}</div>
     <button type="button" class="btn chico" onclick="agregarContacto('correo')">${ic('plus')}Agregar otro correo</button>
     <div style="margin-top:16px"><button class="btn pri">Guardar</button></div>
@@ -1639,12 +1646,15 @@ function ajustesEmpresa(cfg) {
 function guardarEmpresa(ev) {
   ev.preventDefault();
   const fd = new FormData(ev.target);
-  const wsp = fd.getAll('wsp').map(x => x.trim()).filter(Boolean), correo = fd.getAll('correo').map(x => x.trim()).filter(Boolean);
-  const malo = wsp.find(x => x.replace(/\D/g, '').length < 10);
+  const leer = tipo => [...ev.target.querySelectorAll(`#lista-${tipo} .fila-contacto`)]
+    .map(f => ({ v: f.querySelector(`[name=${tipo}]`).value.trim(), on: f.querySelector('[type=checkbox]').checked })).filter(x => x.v);
+  const wspLista = leer('wsp'), correoLista = leer('correo');
+  const activos = xs => xs.filter(x => x.on).map(x => x.v).join(', ');
+  const malo = wspLista.map(x => x.v).find(x => x.replace(/\D/g, '').length < 10);
   if (malo) { toast(`Revisa el número "${malo}": escríbelo con código de país, por ejemplo +56 9 1234 5678`); return; }
   const empresa = fd.get('empresa').trim();
   if (!empresa) { toast('Falta el nombre de la empresa'); return; }
-  S.config = { ...S.config, empresa, telefono: fd.get('telefono').trim(), wsp: wsp.join(', '), correo: correo.join(', ') };
+  S.config = { ...S.config, empresa, telefono: fd.get('telefono').trim(), wspLista, correoLista, wsp: activos(wspLista), correo: activos(correoLista) };
   guardar(); toast('Datos de la empresa guardados'); render();
 }
 function ajustesAlertas(cfg) {
