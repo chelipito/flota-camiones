@@ -282,7 +282,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <span class="avatar" id="avatar" aria-hidden="true"></span>
   </header>
-  <div class="demo-banda">Demostración · datos de ejemplo · versión 9</div>
+  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 10</div>
   <main id="app"></main>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
@@ -361,7 +361,7 @@ function fotoEjemplo(valor) {
 }
 
 /* ============ Datos de ejemplo ============ */
-const CLAVE = 'flota-demo-v3';
+const CLAVE = 'flota-demo-v4'; // v4: un solo camión para la presentación
 function crearDemo() {
   const r = rng(7);
   const base = hoy0().getTime();
@@ -369,26 +369,16 @@ function crearDemo() {
   const usuarios = [
     { id: 'u0', nombre: 'Administración', correo: 'dueno@ejemplo.cl', telefono: '+56 9 0000 0000', rol: 'dueno', activo: true, acceso: Date.now() },
     { id: 'u1', nombre: 'Juan Pérez', correo: 'juan.perez@ejemplo.cl', telefono: '+56 9 0000 0011', rol: 'empleado', activo: true, acceso: base - DIA + 17 * 3600000 },
-    { id: 'u2', nombre: 'Luis Soto', correo: 'luis.soto@ejemplo.cl', telefono: '+56 9 0000 0012', rol: 'empleado', activo: true, acceso: base - DIA + 18 * 3600000 },
-    { id: 'u3', nombre: 'Pablo Contreras', correo: 'pcontreras@andessur.ejemplo', telefono: '+56 9 0000 0001', rol: 'cliente', contratoId: 'k1', activo: true, acceso: base - 3 * DIA },
-    { id: 'u4', nombre: 'Carla Muñoz', correo: 'cmunoz@cerroalto.ejemplo', telefono: '+56 9 0000 0002', rol: 'cliente', contratoId: 'k2', activo: false, acceso: null }
   ];
   const contratos = [
     { id: 'k1', numero: 'CT-2026-014', empresa: 'Constructora Andes Sur', rut: '76.000.000-1', faena: 'Obra Ruta 5, km 210', inicio: enDias(-340), termino: enDias(25),
       admin: { nombre: 'Pablo Contreras', cargo: 'Administrador de contrato', telefono: '+56 9 0000 0001', correo: 'pcontreras@andessur.ejemplo' },
-      notas: 'Arriendo con operador. La mantención es responsabilidad del arrendador.' },
-    { id: 'k2', numero: 'CT-2026-021', empresa: 'Minera Cerro Alto', rut: '77.000.000-2', faena: 'Faena Cerro Alto, sector norte', inicio: enDias(-120), termino: enDias(245),
-      admin: { nombre: 'Carla Muñoz', cargo: 'Jefa de contrato', telefono: '+56 9 0000 0002', correo: 'cmunoz@cerroalto.ejemplo' },
-      notas: 'Arriendo sin operador. Reporte de horómetro diario.' }
+      notas: 'Arriendo con operador. La mantención es responsabilidad del arrendador.' }
   ];
   // [patente, tipo, modelo, empleado que registra, límite h, % usado, días a la RT, días sin registro, contrato]
-  // Un caso por camión: RT vencida, disponible con RT y horas por vencer, horas urgentes, sin reporte y al día
+  // Presentación: un solo camión arrendado (la patente debe coincidir con la de supabase/esquema.sql)
   const defs = [
-    ['KDLP21', 'Camión tolva', 'Volvo FMX 460', 'u1', 12000, 0.62, -3, 1, 'k1'],
-    ['JHRT45', 'Camión aljibe', 'Mercedes-Benz Actros', '', 10000, 0.86, 18, 2, null],
-    ['GFTS12', 'Camión tolva', 'Volvo FMX 460', 'u2', 10000, 0.963, 120, 1, 'k2'],
-    ['PRDW77', 'Camión rampla', 'Scania G410', 'u1', 12000, 0.41, 210, 4, 'k1'],
-    ['KTVB09', 'Camión tolva', 'Volvo FMX 460', '', 12000, 0.35, 95, 2, null]
+    ['HKTZ48', 'Camión tolva', 'Volvo FMX 460', 'u1', 12000, 0.62, 40, 2, 'k1']
   ];
   const camiones = defs.map((d, i) => {
     const [patente, tipo, modelo, operador, limite, pct, diasRT, sinReg, contratoId] = d;
@@ -424,6 +414,42 @@ if (!S || !S.camiones) S = crearDemo();
 S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() { try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ } }
+
+/* ============ Registro real por WhatsApp (Supabase) ============ */
+// Datos del proyecto de Supabase. La clave pública (anon) solo permite leer: lo define supabase/esquema.sql
+const SUPA_URL = '';
+const SUPA_KEY = '';
+const WSP_NUMERO = ''; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
+const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
+S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
+let FIRMA = '', ULTIMO_ID = null;
+async function traerLecturas() {
+  try {
+    const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const filas = await res.json();
+    $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : '');
+    const firma = filas.map(f => f.id).join() + JSON.stringify(S.estados);
+    if (firma === FIRMA) return;
+    FIRMA = firma;
+    const ult = filas.length ? filas.reduce((a, b) => (a.id > b.id ? a : b)) : null;
+    if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID) toast(`Llegó por WhatsApp: ${fmtPatente(ult.patente)} · ${n1(ult.valor)} h`);
+    if (ult) ULTIMO_ID = ult.id;
+    S.camiones.forEach(c => {
+      const ls = filas.filter(f => f.patente === c.patente);
+      if (!ls.length) return;
+      c.lecturas = ls.map(f => {
+        const id = 'r' + f.id, e = S.estados[id] || {};
+        return { id, fecha: Date.parse(f.fecha), valor: Number(f.valor), quien: f.nombre || 'WhatsApp', origen: f.origen, foto: false, img: null, sync: 'enviado',
+          estado: e.estado || (f.origen === 'whatsapp' ? 'pendiente' : 'validado'), nota: e.nota };
+      });
+    });
+    const escribiendo = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement && document.activeElement.tagName);
+    if (!escribiendo) render();
+  } catch (e) {
+    $('#banda').textContent = 'Sin conexión con la base de datos · reintentando…';
+  }
+}
 
 /* ============ Reglas de negocio ============ */
 const usuario = id => S.usuarios.find(u => u.id === id) || { nombre: '—' };
@@ -533,7 +559,7 @@ const SECCION = { wsp: 'horometros', camion: 'flota', editar: 'flota', contrato:
 const TITULO = Object.fromEntries([...MENU.map(m => [m[0], m[2]]), ['ajustes', 'Configuración'], ['perfil', 'Ver como otro perfil']]);
 const HOME = { dueno: 'inicio', empleado: 'empleado', cliente: 'cliente' };
 const PERMISOS = { empleado: ['empleado', 'registrar', 'wsp'], cliente: ['cliente'] }; // el dueño ve todo menos las vistas de los otros perfiles (el chat de prueba sí)
-const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'wsp', 'usuarios', 'editar-usuario']; // vistas guardadas para más adelante
+const ESCONDIDAS = ['perfil', 'empleado', 'registrar', 'cliente', 'usuarios', 'editar-usuario', ...(REAL ? ['wsp'] : [])]; // vistas guardadas para más adelante; la simulación de WhatsApp es el plan B
 function permitido(rol, r) { return rol === 'dueno' ? !ESCONDIDAS.includes(r) : PERMISOS[rol].includes(r); }
 function leerRuta() {
   const [path, qs = ''] = location.hash.slice(1).split('?');
@@ -665,7 +691,7 @@ VISTAS.inicio = () => {
   return `
   <div class="fecha-larga">${fechaLarga()}</div>
   <h1>${saludo()}</h1>
-  <p>Tienes <b>${cs.length} camiones</b>: ${arr} arrendados y ${disp} disponibles. ${items.length ? `Hay <b>${items.length} temas por revisar</b>.` : 'Todo está al día.'}</p>
+  <p>Tienes <b>${nCam(cs.length)}</b>: ${arr} ${arr === 1 ? 'arrendado' : 'arrendados'} y ${disp} ${disp === 1 ? 'disponible' : 'disponibles'}. ${items.length ? `Hay <b>${items.length === 1 ? '1 tema' : items.length + ' temas'} por revisar</b>.` : 'Todo está al día.'}</p>
   <div class="kpis">
     ${kpi('marca', cs.length, 'Flota total', 'truck', '#flota')}
     ${kpi('', arr, 'Arrendados', 'building', '#flota?f=arrendados')}
@@ -752,12 +778,12 @@ VISTAS.camion = id => {
       <div class="barra ${h.e}" role="img" aria-label="${Math.floor(h.pct)}% del límite usado"><span style="width:${Math.min(100, h.pct)}%"></span></div>
       <div class="chips" style="margin-bottom:.5rem">${chip(h.e, h.txt)}</div>
       <p class="sec" style="margin:0 0 .75rem">${h.pct >= 100 ? 'Ya superó el límite.' : h.dias != null ? `Usa en promedio <b>${n1(h.prom)} h por día</b>. Le quedan <b>${n0(h.resta)} h</b>: llegaría al límite cerca del <b>${fecha(h.fechaLim)}</b>.` : `Le quedan <b>${n0(h.resta)} h</b>. Sin uso reciente para proyectar.`}</p>
-      <form class="no-print" onsubmit="registrarDueno(event,'${c.id}')">
+      ${REAL ? `<p class="sec" style="margin:0">Para registrar, manda por WhatsApp${WSP_NUMERO ? ' al <b>' + esc(WSP_NUMERO) + '</b>' : ''} el número del horómetro (por ejemplo, <b>${n0(Math.floor(h.actual) + 8)}</b>).</p>` : `<form class="no-print" onsubmit="registrarDueno(event,'${c.id}')">
         <label class="campo" style="margin-bottom:.5rem">Nueva lectura del horómetro
           <input name="lectura" inputmode="decimal" autocomplete="off" placeholder="Ej.: ${n0(Math.floor(h.actual) + 8)}" aria-describedby="ayudaH${c.id}"></label>
         <p id="ayudaH${c.id}" class="ayuda" style="margin:0 0 .5rem">Debe ser igual o mayor que ${n1(h.actual)} h.</p>
         <button class="btn chico cta">${ic('gauge')}Registrar horómetro</button>
-      </form>
+      </form>`}
     </section>
   </div>
   ${k ? `<section class="tarjeta">
@@ -775,7 +801,7 @@ VISTAS.camion = id => {
     <div class="tabla-wrap"><table>
       <thead><tr><th>Fecha</th><th>Lectura</th><th>Foto</th><th>Estado</th></tr></thead>
       <tbody>${ls.slice(-10).reverse().map(l => `<tr>
-        <td>${fechaCorta(l.fecha)} ${hora(l.fecha)}<br><span class="sec">${esc(usuario(l.usuario).nombre)}${l.origen === 'whatsapp' ? ' · WhatsApp' : ''}</span></td>
+        <td>${fechaCorta(l.fecha)} ${hora(l.fecha)}<br><span class="sec">${esc(l.quien || usuario(l.usuario).nombre)}${l.origen === 'whatsapp' ? ' · WhatsApp' : ''}</span></td>
         <td class="num">${n1(l.valor)}</td>
         <td>${l.foto === false ? '<span class="sec">—</span>' : `<img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)}">`}</td>
         <td>${celdaEstado(l, c.id)}</td></tr>`).join('')}</tbody>
@@ -790,7 +816,8 @@ function celdaEstado(l, cid) {
 function validar(cid, lid, ok) {
   const l = camion(cid).lecturas.find(x => x.id === lid);
   if (ok) { l.estado = 'validado'; toast('Registro validado'); }
-  else { const nota = prompt('¿Qué tiene de malo este registro? (queda anotado en el registro)', 'No se lee bien el número en la foto.'); if (nota === null) return; l.estado = 'observado'; l.nota = nota; toast('Registro observado'); }
+  else { const nota = prompt('¿Qué tiene de malo este registro? (queda anotado en el registro)', 'No se lee bien el número.'); if (nota === null) return; l.estado = 'observado'; l.nota = nota; toast('Registro observado'); }
+  S.estados[lid] = { estado: l.estado, nota: l.nota };
   guardar(); render();
 }
 
@@ -998,7 +1025,7 @@ VISTAS.horometros = () => {
   pend.sort((a, b) => b.l.fecha - a.l.fecha);
   return `
   <div class="cab"><div><h1>Horómetros</h1><p class="sec" style="margin:0">Horas de motor de cada camión respecto de su límite.</p></div>
-    <div class="acciones no-print"><button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
+    <div class="acciones no-print">${REAL ? '' : `<a class="btn chico wsp" href="#wsp">${ic('send')}Registrar por WhatsApp (simulación)</a>`}<button class="btn chico" onclick="exportarCSV()">${ic('download')}Excel</button></div></div>
   <div class="kpis k3">
     ${kpi(cerca ? 'porvencer' : '', cerca, 'Cerca del límite', 'gauge')}
     ${kpi(sr ? 'sinreporte' : '', sr, 'Sin reporte', 'wifi-off')}
@@ -1008,10 +1035,10 @@ VISTAS.horometros = () => {
   <div class="lista" style="--cols:56px minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.3fr) auto;--cols-m:56px minmax(0,1fr) auto">
     <div class="lista-cab"><span>Foto</span><span>Camión</span><span>Lectura</span><span>Registró</span><span></span></div>
     ${pend.map(({ c, l, ant }) => `<div class="lista-fila">
-      <img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)} h" onclick="verFoto(this.src)" style="cursor:zoom-in">
+      ${l.foto === false ? `<span class="chip-ico ok" aria-hidden="true">${ic('send')}</span>` : `<img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)} h" onclick="verFoto(this.src)" style="cursor:zoom-in">`}
       <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${cuando(l.fecha)}<span class="solo-movil"> · ${n1(l.valor)} h</span></span></span>
       <span class="opc"><b class="num">${n1(l.valor)} h</b><span class="sub">${ant ? `+${n1(l.valor - ant.valor)} h` : 'Primer registro'}</span></span>
-      <span class="opc">${esc(usuario(l.usuario).nombre)}<span class="sub">${l.origen === 'whatsapp' ? 'vía WhatsApp' : 'vía app'}</span></span>
+      <span class="opc">${esc(l.quien || usuario(l.usuario).nombre)}<span class="sub">${l.origen === 'whatsapp' ? 'vía WhatsApp' : 'vía app'}</span></span>
       <span class="acciones" style="gap:6px;flex-wrap:nowrap"><button class="btn chico pri" onclick="validar('${c.id}','${l.id}',true)" aria-label="Validar registro de ${fmtPatente(c.patente)}">${ic('check')}<span class="opc-txt">Validar</span></button><button class="btn chico" onclick="validar('${c.id}','${l.id}',false)">Observar</button></span>
     </div>`).join('')}
   </div>` : ''}
@@ -1493,6 +1520,7 @@ function exportarCSV() {
 }
 
 render();
+if (REAL) { traerLecturas(); setInterval(traerLecturas, 10000); } // cada 10 segundos revisa si llegó algo por WhatsApp
 </script>
 </body>
 </html>
