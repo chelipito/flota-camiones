@@ -83,6 +83,8 @@ body:not(.con-side) .top{border-bottom:4px solid var(--acento)}
 @media (max-width:480px){.top .volver:not([hidden]) ~ .marca .marca-txt{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
 .demo-banda{background:var(--acento);color:var(--sobre-acento);text-align:center;font-size:.85rem;padding:.3rem 16px;font-weight:600}
 body.con-side .demo-banda{background:var(--acento-suave)}
+.demo-banda:not(.alerta):not(.local){display:none}
+.demo-banda.alerta{background:#FEF3C7;color:#78350F}
 
 main{max-width:1120px;margin:0 auto;padding:20px 16px 48px}
 .tarjeta{background:var(--tarjeta);border:1px solid var(--borde);border-radius:var(--radio);padding:16px;margin-bottom:12px}
@@ -333,7 +335,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
   body.con-side #campana,body.con-side .top .avatar{display:grid !important;width:40px;height:40px;border-radius:50%;background:#E4E6EB;color:#111;place-items:center}
   body.con-side .top .avatar{font-size:.85rem;text-decoration:none}
   body.con-side #campana .ico{width:21px;height:21px}
-  body.con-side .demo-banda:not(.alerta){display:none}
+  body.con-side .demo-banda:not(.alerta):not(.local){display:none}
   body.con-side main{padding:12px 12px calc(84px + env(safe-area-inset-bottom))}
   body.con-side h1{font-size:1.3rem}
   body.con-side h2{font-size:1.05rem}
@@ -384,7 +386,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
     <a class="btn-ico" id="campana" href="#avisos" hidden></a>
     <a class="avatar" id="avatar" href="#mi-cuenta" aria-label="Mi cuenta" title="Mi cuenta"></a>
   </header>
-  <div class="demo-banda" id="banda">Demostración · datos de ejemplo · versión 31</div>
+  <div class="demo-banda" id="banda"></div>
   <main id="app"></main>
   <nav class="tabbar no-print" id="tabbar" aria-label="Navegación principal"></nav>
 </div>
@@ -533,6 +535,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
+const VERSION = '32'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -613,7 +616,7 @@ async function traerLecturas() {
       const c = S.camiones[0], k = cams[0];
       if (c.patente !== k.patente || c.limite !== Number(k.limite)) { c.patente = k.patente; c.limite = Number(k.limite); cambioCamion = true; guardar(); }
     }
-    $('#banda').textContent = 'En vivo · el horómetro llega por WhatsApp' + (WSP_NUMERO ? ' al ' + WSP_NUMERO : ''); $('#banda').classList.remove('alerta');
+    $('#banda').classList.remove('alerta'); // conexión bien: la franja se esconde
     const firma = filas.map(f => f.id).join() + JSON.stringify(S.estados);
     if (firma === FIRMA && !cambioCamion && !cambioEstado) return;
     FIRMA = firma;
@@ -1719,7 +1722,8 @@ function ajustesEmpresa(cfg) {
     <div style="margin-top:16px"><button class="btn pri">Guardar</button></div>
   </form>
   ${REAL ? `<div class="tarjeta"><h2>Sesión</h2><p class="sec">Conectado como <b>${esc((SESION && SESION.correo) || '')}</b>. Los cambios se comparten con todos los que entran a la app.</p>
-    <button class="btn no-print" onclick="salir()">Cerrar sesión</button></div>` : '<button class="btn no-print" onclick="reiniciar()">Reiniciar datos de ejemplo</button>'}`;
+    <button class="btn no-print" onclick="salir()">Cerrar sesión</button></div>` : '<button class="btn no-print" onclick="reiniciar()">Reiniciar datos de ejemplo</button>'}
+  <p class="sec" style="text-align:center;margin-top:16px">Control de Flota · versión ${VERSION}</p>`;
 }
 function guardarEmpresa(ev) {
   ev.preventDefault();
@@ -2153,7 +2157,8 @@ function exportarCSV() {
 }
 
 render();
-if (REAL) { traerLecturas(); setInterval(traerLecturas, 10000); if (SESION) cargarPerfil(); } // cada 10 segundos revisa si llegó algo por WhatsApp
+if (REAL) { traerLecturas(); setInterval(traerLecturas, 10000); if (SESION) cargarPerfil(); }
+else { $('#banda').textContent = 'Modo de prueba · datos de ejemplo guardados solo en este navegador'; $('#banda').classList.add('local'); } // cada 10 segundos revisa si llegó algo por WhatsApp
 </script>
 </body>
 </html>
