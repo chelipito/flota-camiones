@@ -34,7 +34,7 @@ async function enviarWsp(a: string, texto: string) {
   const url = `https://graph.facebook.com/v25.0/${PHONE_ID}/messages`;
   const headers = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
   const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'template',
-    template: { name: 'alerta_flota', language: { code: 'es_CL' }, components: [{ type: 'body', parameters: [{ type: 'text', text: texto.replace(/\s*\n+\s*/g, ' · ') }] }] } }) });
+    template: { name: 'alerta_flota', language: { code: 'es_CL' }, components: [{ type: 'body', parameters: [{ type: 'text', text: texto.replace(/\s*\n+\s*/g, ' · ').slice(0, 900) }] }] } }) }); // la plantilla admite ~1.000 caracteres
   if (r.ok) return { ok: true };
   const error = await r.text();
   const r2 = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'text', text: { body: texto } }) });
