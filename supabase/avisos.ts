@@ -26,18 +26,20 @@ const utc = (iso: string) => { const [a, m, d] = iso.split('-').map(Number); ret
 const diasHasta = (iso: string) => Math.round((utc(iso) - utc(hoyChile())) / DIA);
 const fecha = (ms: number) => new Date(ms).toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Santiago' });
 
-// Envía un texto por WhatsApp. Si el dueño no ha escrito en las últimas 24 h, WhatsApp exige una plantilla
-// aprobada por Meta: se intenta con "alerta_flota" (Español (Chile), una variable con el texto del aviso).
+// Envía un aviso por WhatsApp. Va SIEMPRE con la plantilla aprobada "alerta_flota" (Español (Chile), una variable
+// con el texto del aviso): llega aunque la persona nunca haya escrito al número. Un texto normal, en cambio, Meta lo
+// acepta ("OK") pero lo descarta en silencio si la persona no escribió en las últimas 24 h. Si la plantilla falla
+// (p. ej. aún no aprobada), se intenta como texto normal.
 async function enviarWsp(a: string, texto: string) {
   const url = `https://graph.facebook.com/v25.0/${PHONE_ID}/messages`;
   const headers = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
-  const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'text', text: { body: texto } }) });
+  const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'template',
+    template: { name: 'alerta_flota', language: { code: 'es_CL' }, components: [{ type: 'body', parameters: [{ type: 'text', text: texto.replace(/\s*\n+\s*/g, ' · ') }] }] } }) });
   if (r.ok) return { ok: true };
   const error = await r.text();
-  const r2 = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'template',
-    template: { name: 'alerta_flota', language: { code: 'es_CL' }, components: [{ type: 'body', parameters: [{ type: 'text', text: texto.replace(/\s*\n+\s*/g, ' · ') }] }] } }) });
+  const r2 = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ messaging_product: 'whatsapp', to: a, type: 'text', text: { body: texto } }) });
   if (r2.ok) return { ok: true };
-  console.error('No se pudo enviar el aviso', error, await r2.text());
+  console.error('No se pudo enviar el aviso', a, error, await r2.text());
   return { ok: false, error };
 }
 
