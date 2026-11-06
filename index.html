@@ -180,6 +180,7 @@ a.kpi{cursor:pointer}
 .fila-inicio:first-of-type{border-top:0}
 .fila-inicio .cuerpo{flex:1;min-width:0}
 .fila-inicio .barra{display:block;margin:.35rem 0 .2rem}
+.horo-va{margin-left:6px;padding:2px 8px;border-radius:999px;background:var(--fondo);font-size:.8rem;font-weight:600;white-space:nowrap}
 .fila-inicio .fila.entre{display:flex}
 
 /* Formularios */
@@ -535,7 +536,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '32'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '33'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1002,7 +1003,7 @@ VISTAS.inicio = () => {
     <section class="tarjeta">
       <div class="titulo-tarjeta"><h2>Próximas mantenciones</h2><a class="ver-todo" href="#horometros">Ver todo →</a></div>
       ${mants.length ? mants.map(({ c, m }) => `<a class="fila-inicio" href="#camion/${c.id}"><span class="cuerpo">
-        <span class="fila entre"><b>${fmtPatente(c.patente)}</b>${estado(m.e, m.resta > 0 ? `faltan ${n0(m.resta)} h` : `atrasada ${n0(-m.resta)} h`)}</span>
+        <span class="fila entre"><span><b>${fmtPatente(c.patente)}</b> <span class="horo-va num">${ultima(c) ? `lleva ${n1(ultima(c).valor)} h` : 'sin registros'}</span></span>${estado(m.e, m.resta > 0 ? `faltan ${n0(m.resta)} h` : `atrasada ${n0(-m.resta)} h`)}</span>
         <span class="barra ${m.e}" role="img" aria-label="${Math.round(Math.min(100, Math.max(0, (1 - m.resta / S.config.intervaloMant) * 100)))}% del camino a la próxima mantención"><span style="width:${Math.min(100, Math.max(0, (1 - m.resta / S.config.intervaloMant) * 100))}%"></span></span>
         <span class="sub">Próxima a las ${n0(m.prox)} h${m.fechaProx ? ' · aprox. el ' + fecha(m.fechaProx) : ''}</span></span>${ic('chevron')}</a>`).join('')
         : `<p class="sec">Aún no hay camiones.</p><a class="btn chico cta" href="#editar/nuevo">${ic('plus')}Agregar camión</a>`}
