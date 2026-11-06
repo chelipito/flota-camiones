@@ -31,6 +31,7 @@ p{margin:0 0 .75rem}
 a{color:var(--primario)}
 button,input,select,textarea{font:inherit}
 :focus-visible{outline:3px solid var(--foco);outline-offset:2px}
+[tabindex="-1"]:focus{outline:none} /* títulos que reciben el foco al cambiar de pantalla: sin borde */
 .num{font-family:Lexend,sans-serif;font-variant-numeric:tabular-nums}
 .ico{width:1.25em;height:1.25em;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
@@ -535,7 +536,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '34'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '35'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
