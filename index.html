@@ -228,13 +228,24 @@ th{color:var(--texto-2);font-weight:600}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--texto);color:#fff;padding:.7rem 1.1rem;border-radius:10px;font-weight:600;z-index:50;max-width:calc(100% - 32px);text-align:center}
 .vacio{text-align:center;color:var(--texto-2);padding:24px}
 .filtros{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
-.regla{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:.5rem 0}
-.alerta-cuerpo{display:grid;gap:12px}
-@media (min-width:760px){.alerta-cuerpo{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}}
-.ejemplo{background:#F8FAFC;border:1px dashed #CBD5E1;border-radius:10px;padding:.75rem .9rem;font-size:.92rem;color:#334155}
-.ejemplo b{color:#0F172A}
-.ejemplo .t{display:block;font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748B;margin-bottom:.25rem}
-.regla input{width:6.5rem;text-align:right}
+/* Configuración → Alertas: filas que se abren para editar */
+.ajuste{border-top:1px solid var(--borde)}
+.ajuste:first-of-type{border-top:0}
+.ajuste summary{list-style:none;display:flex;align-items:center;gap:12px;padding:12px 0;min-height:56px;cursor:pointer}
+.ajuste summary::-webkit-details-marker{display:none}
+.ajuste summary .cuerpo{flex:1;min-width:0}
+.ajuste summary .sub{display:block;color:var(--texto-2);font-size:.9rem;font-weight:400}
+.ajuste summary svg{flex:none}
+.ajuste[open] summary svg{transform:rotate(90deg)}
+.canal{font-size:.78rem;color:var(--texto-2);white-space:nowrap}
+.ajuste-campos{display:grid;gap:10px;padding:0 0 14px}
+.dato{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px}
+.dato .entrada{display:flex;align-items:center;gap:6px;flex:none}
+.dato input,.dato select{min-height:44px;border:2px solid var(--borde);border-radius:10px;background:#fff;color:var(--texto);padding:0 .6rem;font-size:16px}
+.dato input{width:5.5rem;text-align:right}
+.ejemplo-linea{margin:0;font-size:.88rem;color:var(--texto-2);background:var(--fondo);border-radius:8px;padding:.5rem .7rem}
+.ejemplo-linea b{color:var(--texto)}
+.check .sub{display:block;color:var(--texto-2);font-size:.9rem;font-weight:400}
 .etiqueta-canal{display:inline-block;font-size:.8rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;background:var(--ok-f, #ecfdf5);color:var(--ok-t, #065f46);margin-left:6px;vertical-align:middle}
 .etiqueta-canal.app{background:#f1f5f9;color:#475569}
 .fila-contacto{display:flex;gap:8px;margin-bottom:8px}
@@ -536,7 +547,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '35'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '36'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1741,45 +1752,51 @@ function guardarEmpresa(ev) {
   guardar(); toast('Datos de la empresa guardados'); render();
 }
 function ajustesAlertas(cfg) {
-  const n = (k, unidad, extra = '') => `<input name="${k}" type="number" min="0" inputmode="numeric" value="${esc(cfg[k])}" required ${extra}> ${unidad}`;
-  const auto = '<span class="etiqueta-canal">WhatsApp automático</span>', app = '<span class="etiqueta-canal app">Se muestra en la app</span>';
-  const tarjeta = (titulo, canal, reglas, id, nota = '') => `<section class="tarjeta"><h2>${titulo} ${canal}</h2>
-    <div class="alerta-cuerpo"><div>${reglas}${nota ? `<p class="sec" style="margin:0">${nota}</p>` : ''}</div><div class="ejemplo" id="ej-${id}"></div></div></section>`;
+  // Un dato por fila: texto a la izquierda, número y unidad a la derecha
+  const n = (k, texto, unidad, extra = '') => `<label class="dato"><span>${texto}</span><span class="entrada">
+    <input name="${k}" type="number" min="0" inputmode="numeric" value="${esc(cfg[k])}" required ${extra}> ${unidad}</span></label>`;
+  // Fila que se abre al tocarla: título + resumen (se actualiza al escribir) + canal
+  const fila = (id, titulo, canal, campos, nota = '') => `<details class="ajuste" id="aj-${id}">
+    <summary><span class="cuerpo"><b>${titulo}</b><span class="sub" id="res-${id}"></span></span><span class="canal">${canal}</span>${ic('chevron')}</summary>
+    <div class="ajuste-campos">${campos}<p class="ejemplo-linea" id="ej-${id}"></p>${nota ? `<p class="sec" style="margin:0">${nota}</p>` : ''}</div></details>`;
   setTimeout(() => pintarEjemplos(cfg));
   const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+  const sel = (k, ops) => `<select name="${k}">${ops.map(([v, t]) => `<option value="${v}" ${String(cfg[k]) === String(v) ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
   return `<form onsubmit="guardarAlertas(event)" oninput="pintarEjemplos(leerAlertas(this))" onchange="pintarEjemplos(leerAlertas(this))">
-    ${tarjeta('Cómo te llegan los avisos', auto, `
-      <label class="check"><input type="checkbox" name="avisoInmediato" ${cfg.avisoInmediato ? 'checked' : ''}> Aviso al momento, cuando algo pasa a 🟡 por vencer o 🔴 urgente</label>
-      <label class="regla">Resumen de lo pendiente:
-        <select name="resumenFrec" style="width:auto">
-          <option value="nunca" ${cfg.resumenFrec === 'nunca' ? 'selected' : ''}>No enviar</option>
-          <option value="diario" ${cfg.resumenFrec === 'diario' ? 'selected' : ''}>Todos los días</option>
-          <option value="semanal" ${cfg.resumenFrec === 'semanal' ? 'selected' : ''}>Una vez por semana</option>
-        </select></label>
-      <label class="regla" id="fila-dia" ${cfg.resumenFrec === 'semanal' ? '' : 'hidden'}>Día:
-        <select name="resumenDia" style="width:auto">${DIAS.slice(1).map((d, i) => `<option value="${i + 1}" ${Number(cfg.resumenDia) === i + 1 ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></label>
-      <label class="regla">Hora:
-        <select name="horaAvisos" style="width:auto">${Array.from({ length: 17 }, (_, i) => i + 6).map(h => `<option value="${h}" ${Number(cfg.horaAvisos) === h ? 'selected' : ''}>${hh(h)}</option>`).join('')}</select></label>`, 'como',
-      'A esa hora sale el resumen y se revisan las fechas (revisión técnica).')}
-    ${tarjeta('Registro del horómetro', '<span class="etiqueta-canal app">Regla</span>', `
-      <p class="regla" style="margin-top:0">✅ Siempre activo: el horómetro nunca puede bajar.</p>
-      <label class="check"><input type="checkbox" name="validarSalto" ${cfg.validarSalto ? 'checked' : ''}> No aceptar más horas de las que pasaron desde el último registro</label>`, 'reg',
-      'Evita errores de tipeo.')}
-    ${tarjeta('Mantención', auto, `
-      <label class="regla">Hacer mantención cada ${n('intervaloMant', 'horas de motor', 'min="1"')}</label>
-      <label class="regla">🟡 Avisar cuando falten ${n('horasMantAviso', 'horas')}</label>
-      <label class="regla">🔴 Avisar urgente cuando falten ${n('horasMantUrgente', 'horas')}</label>`, 'mant', 'Se repite después de cada mantención.')}
-    ${tarjeta('Horómetro: límite total de horas', auto, `
-      <label class="regla">🟡 Avisar cuando llegue al ${n('pctAviso', '% del límite', 'max="100"')}</label>
-      <label class="regla">🔴 Avisar urgente al ${n('pctUrgente', '% del límite', 'max="100"')}</label>`, 'lim', 'Una sola vez. El límite se edita en la ficha del camión.')}
-    ${tarjeta('Revisión técnica', auto, `
-      <label class="regla">🟡 Avisar ${n('diasPorVencer', 'días antes del vencimiento')}</label>
-      <label class="regla">🔴 Urgente ${n('diasUrgente', 'días antes')}</label>`, 'rt', `Se revisa todos los días a las <span class="hora-txt">${hh(cfg.horaAvisos)}</span>.`)}
-    ${tarjeta('Contratos de arriendo', app, `
-      <label class="regla">🟡 Avisar para renegociar ${n('diasContratoAviso', 'días antes del término')}</label>
-      <label class="regla">🔴 Urgente ${n('diasContratoUrgente', 'días antes')}</label>`, 'con')}
-    ${tarjeta('Camiones sin reporte', app, `
-      <label class="regla">Avisar si un camión arrendado pasa ${n('diasSinReporte', 'días sin registrar el horómetro')}</label>`, 'sr')}
+    <section class="tarjeta">
+      <h2>Cómo te llegan los avisos</h2>
+      <label class="check"><input type="checkbox" name="avisoInmediato" ${cfg.avisoInmediato ? 'checked' : ''}>
+        <span>Aviso al momento<span class="sub">Apenas algo pasa a 🟡 por vencer o 🔴 urgente</span></span></label>
+      <label class="dato"><span>Resumen</span><span class="entrada">${sel('resumenFrec', [['nunca', 'No enviar'], ['diario', 'Todos los días'], ['semanal', 'Una vez por semana']])}</span></label>
+      <label class="dato" id="fila-dia" ${cfg.resumenFrec === 'semanal' ? '' : 'hidden'}><span>Día</span><span class="entrada">${sel('resumenDia', DIAS.slice(1).map((d, i) => [i + 1, d[0].toUpperCase() + d.slice(1)]))}</span></label>
+      <label class="dato"><span>Hora</span><span class="entrada">${sel('horaAvisos', Array.from({ length: 17 }, (_, i) => [i + 6, hh(i + 6)]))}</span></label>
+      <p class="ejemplo-linea" id="ej-como"></p>
+    </section>
+    <section class="tarjeta">
+      <h2>Cuándo avisar</h2>
+      <p class="sec" style="margin-top:0">Toca una fila para cambiarla. 🟡 = primer aviso · 🔴 = urgente.</p>
+      ${fila('mant', 'Mantención', 'WhatsApp', `
+        ${n('intervaloMant', 'Cada cuántas horas', 'h', 'min="1"')}
+        ${n('horasMantAviso', '🟡 Cuando falten', 'h')}
+        ${n('horasMantUrgente', '🔴 Cuando falten', 'h')}`, 'Se repite después de cada mantención.')}
+      ${fila('lim', 'Límite de horas', 'WhatsApp', `
+        ${n('pctAviso', '🟡 Al llegar al', '%', 'max="100"')}
+        ${n('pctUrgente', '🔴 Al llegar al', '%', 'max="100"')}`, 'El límite de cada camión se cambia en su ficha.')}
+      ${fila('rt', 'Revisión técnica', 'WhatsApp', `
+        ${n('diasPorVencer', '🟡 Días antes de vencer', 'días')}
+        ${n('diasUrgente', '🔴 Días antes de vencer', 'días')}`)}
+      ${fila('con', 'Contratos de arriendo', 'En la app', `
+        ${n('diasContratoAviso', '🟡 Días antes del término', 'días')}
+        ${n('diasContratoUrgente', '🔴 Días antes del término', 'días')}`)}
+      ${fila('sr', 'Camiones sin reporte', 'En la app', `
+        ${n('diasSinReporte', 'Días sin registrar', 'días')}`, 'Solo camiones arrendados.')}
+    </section>
+    <section class="tarjeta">
+      <h2>Registro del horómetro</h2>
+      <p class="sec" style="margin-top:0">✅ Siempre: el horómetro nunca puede bajar.</p>
+      <label class="check"><input type="checkbox" name="validarSalto" ${cfg.validarSalto ? 'checked' : ''}>
+        <span>Bloquear saltos imposibles<span class="sub" id="ej-reg"></span></span></label>
+    </section>
     <button class="btn pri" style="margin-bottom:16px">Guardar alertas</button>
   </form>`;
 }
@@ -1792,29 +1809,28 @@ function leerAlertas(f) {
 }
 // Ejemplos con los números que el dueño está escribiendo (se actualizan mientras escribe)
 function pintarEjemplos(c) {
-  const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = '<span class="t">Ejemplo</span>' + html; };
+  const pon = (id, html) => { const el = $('#ej-' + id); if (el) el.innerHTML = html; };
+  const res = (id, txt) => { const el = $('#res-' + id); if (el) el.textContent = txt; };
   const dia = d => fecha(hoy0().getTime() + d * DIA);
   const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
-  document.querySelectorAll('.hora-txt').forEach(e => { e.textContent = hh(c.horaAvisos); });
-  pon('como', `${c.avisoInmediato ? '🟡 Al momento: "HKTZ48: faltan 25 h para la mantención".' : 'Sin aviso al momento.'}<br>
-    ${c.resumenFrec === 'diario' ? `📋 Cada día a las ${hh(c.horaAvisos)}: "Resumen: 3 pendientes…"` : c.resumenFrec === 'semanal' ? `📋 Cada ${DIAS[c.resumenDia] || 'lunes'} a las ${hh(c.horaAvisos)}: "Resumen: 3 pendientes…"` : 'Sin resumen.'}`);
-  pon('reg', `Hace 2 h marcaba <b>7.450</b> y llega <b>7.540</b>:<br>
-    ${c.validarSalto ? '❌ Se rechaza: no pudo sumar 90 h en 2 h.' : '⚠️ Se acepta igual (regla apagada).'}`);
+  const d = (x) => `${x} ${x === 1 ? 'día' : 'días'}`;
+  // Resumen de cada fila (se ve sin abrirla)
+  res('mant', `Cada ${n0(c.intervaloMant)} h · avisa faltando ${n0(c.horasMantAviso)} h`);
+  res('lim', `Avisa al ${c.pctAviso} % del límite`);
+  res('rt', `Avisa ${d(c.diasPorVencer)} antes`);
+  res('con', `Avisa ${d(c.diasContratoAviso)} antes del término`);
+  res('sr', `Después de ${d(c.diasSinReporte)} sin registros`);
+  // Ejemplos de una línea con los números que se están escribiendo
+  const resumen = c.resumenFrec === 'diario' ? `📋 resumen todos los días a las ${hh(c.horaAvisos)}`
+    : c.resumenFrec === 'semanal' ? `📋 resumen cada ${DIAS[c.resumenDia] || 'lunes'} a las ${hh(c.horaAvisos)}` : '';
+  pon('como', `Te llega: ${[c.avisoInmediato ? '🟡🔴 aviso al momento' : '', resumen].filter(Boolean).join(' + ') || '<b>nada</b> (todo apagado)'}.`);
+  pon('reg', c.validarSalto ? 'Ej.: no deja sumar 90 h si pasaron 2 h.' : 'Apagado: acepta cualquier salto de horas.');
   const prox = 7250 + (c.intervaloMant || 250);
-  pon('mant', `Próxima mantención: <b>${n0(prox)} h</b><br>
-    🟡 Aviso a las <b>${n0(prox - c.horasMantAviso)} h</b><br>
-    🔴 Urgente a las <b>${n0(prox - c.horasMantUrgente)} h</b>`);
-  pon('lim', `Límite del camión: <b>12.000 h</b><br>
-    🟡 Aviso a las <b>${n0(12000 * c.pctAviso / 100)} h</b><br>
-    🔴 Urgente a las <b>${n0(12000 * c.pctUrgente / 100)} h</b>`);
-  pon('rt', `Vence el <b>${dia(45)}</b><br>
-    🟡 Aviso el <b>${dia(45 - c.diasPorVencer)}</b><br>
-    🔴 Urgente el <b>${dia(45 - c.diasUrgente)}</b>`);
-  pon('con', `Termina el <b>${dia(90)}</b><br>
-    🟡 Aviso el <b>${dia(90 - c.diasContratoAviso)}</b><br>
-    🔴 Urgente el <b>${dia(90 - c.diasContratoUrgente)}</b>`);
-  pon('sr', `Último registro: <b>${dia(0)}</b><br>
-    Sin registros hasta el <b>${dia(c.diasSinReporte + 1)}</b> → aparece como "sin reporte".`);
+  pon('mant', `Ej.: mantención a las <b>${n0(prox)} h</b> → 🟡 a las <b>${n0(prox - c.horasMantAviso)} h</b> · 🔴 a las <b>${n0(prox - c.horasMantUrgente)} h</b>`);
+  pon('lim', `Ej.: límite de <b>12.000 h</b> → 🟡 a las <b>${n0(12000 * c.pctAviso / 100)} h</b> · 🔴 a las <b>${n0(12000 * c.pctUrgente / 100)} h</b>`);
+  pon('rt', `Ej.: vence el <b>${dia(45)}</b> → 🟡 el <b>${dia(45 - c.diasPorVencer)}</b> · 🔴 el <b>${dia(45 - c.diasUrgente)}</b>`);
+  pon('con', `Ej.: termina el <b>${dia(90)}</b> → 🟡 el <b>${dia(90 - c.diasContratoAviso)}</b> · 🔴 el <b>${dia(90 - c.diasContratoUrgente)}</b>`);
+  pon('sr', `Ej.: último registro hoy → aparece "sin reporte" el <b>${dia(c.diasSinReporte + 1)}</b>`);
 }
 function guardarAlertas(ev) {
   ev.preventDefault();
@@ -1823,12 +1839,13 @@ function guardarAlertas(ev) {
   for (const [k, v] of new FormData(ev.target)) if (!TEXTO.includes(k)) nuevo[k] = Math.max(0, Number(v) || 0);
   nuevo.validarSalto = ev.target.validarSalto.checked; nuevo.avisoInmediato = ev.target.avisoInmediato.checked;
   nuevo.resumenFrec = ev.target.resumenFrec.value; nuevo.resumenDia = Number(ev.target.resumenDia.value) || 1; nuevo.horaAvisos = Number(ev.target.horaAvisos.value);
-  if (nuevo.intervaloMant < 1) { toast('La mantención debe ser cada 1 hora o más'); return; }
-  if (nuevo.horasMantAviso >= nuevo.intervaloMant) { toast('El aviso de mantención debe ser menor que el intervalo de mantención'); return; }
-  const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica'], ['diasContratoUrgente', 'diasContratoAviso', 'Contratos']]
-    .filter(([u, a]) => nuevo[u] > nuevo[a]).map(x => x[2]);
-  if (nuevo.pctAviso > nuevo.pctUrgente) malos.push('Horómetro');
-  if (malos.length) { toast(`Revisa ${malos.join(', ')}: el aviso urgente debe llegar después del primer aviso`); return; }
+  const abrir = id => { const el = $('#aj-' + id); if (el) el.open = true; }; // abre la fila con el error
+  if (nuevo.intervaloMant < 1) { abrir('mant'); toast('La mantención debe ser cada 1 hora o más'); return; }
+  if (nuevo.horasMantAviso >= nuevo.intervaloMant) { abrir('mant'); toast('El aviso de mantención debe ser menor que el intervalo de mantención'); return; }
+  const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención', 'mant'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica', 'rt'], ['diasContratoUrgente', 'diasContratoAviso', 'Contratos', 'con']]
+    .filter(([u, a]) => nuevo[u] > nuevo[a]);
+  if (nuevo.pctAviso > nuevo.pctUrgente) malos.push([, , 'Límite de horas', 'lim']);
+  if (malos.length) { malos.forEach(x => abrir(x[3])); toast(`Revisa ${malos.map(x => x[2]).join(', ')}: el 🔴 urgente debe llegar después del 🟡 primer aviso`); return; }
   S.config = nuevo; guardar(); toast('Alertas guardadas'); render();
 }
 
