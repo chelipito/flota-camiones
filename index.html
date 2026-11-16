@@ -381,6 +381,14 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .menu-grilla a .ico{width:26px;height:26px}
 .menu-grilla a b{font-size:.95rem}
 .menu-grilla .badge{position:absolute;top:10px;right:10px}
+.dlg{border:0;border-radius:14px;padding:18px;width:min(92vw,420px);color:var(--texto)}
+.dlg::backdrop{background:rgba(0,0,0,.5)}
+.dlg h2{margin:0 0 .5rem}
+.btn.peligro-lleno{background:var(--ur-t);border-color:var(--ur-t);color:#fff}
+.docs{list-style:none;margin:.75rem 0;padding:0;border-top:1px solid var(--borde)}
+.docs li{display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--borde)}
+.docs li button.doc{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
+.docs li button.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 main h2.grupo-mas,body.con-side main h2.grupo-mas{font-family:inherit;font-weight:700;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--texto-2);margin:16px 2px 8px}
 @media print{.tabbar{display:none !important}}
 @media print{.side,.scrim,.top,.demo-banda,.no-print{display:none !important}body.con-side .contenido{margin-left:0}main{padding:0}.tarjeta{break-inside:avoid}.papel{border:0;box-shadow:none;padding:0}}
@@ -549,7 +557,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '37'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '38'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1110,13 +1118,22 @@ VISTAS.camion = id => {
       <div class="acciones"><a class="btn chico pri" href="#contrato/${k.id}">Ver contrato</a><a class="btn chico" href="#ficha/${k.id}">${ic('file')}Ficha</a></div>
     </section>` : `<section class="tarjeta nota">
       <h2>Disponible para arriendo</h2><p class="sec">Este camión no tiene contrato vigente.</p>
-      <a class="btn cta" href="#editar-contrato/nuevo?camion=${c.id}">${ic('plus')}Arrendar este camión</a>
+      <div class="acciones no-print"><a class="btn cta" href="#editar-contrato/nuevo?camion=${c.id}">${ic('plus')}Arrendar este camión</a>
+        <button class="btn peligro" onclick="quitarCamion('${c.id}')">Eliminar camión</button></div>
     </section>`}
   <div class="grid grid-2">
     <section class="tarjeta borde-${rt.e}">
       <h2>Revisión técnica</h2>
       <p style="margin:0">Vence el <b>${fecha(dISO(c.rtVence))}</b></p>
       <div class="chips" style="margin:.5rem 0 0">${chip(rt.e, rt.txt)}</div>
+      <h3 style="margin:1rem 0 0;font-size:1rem">Documentos</h3>
+      ${(c.docsRT || []).length ? `<ul class="docs">${c.docsRT.map(d => `<li><button class="doc" onclick="abrirDocRT('${c.id}','${d.id}')" title="Abrir"><b>${esc(d.nombre)}</b><span class="sec">Subido el ${fecha(new Date(d.fecha))}</span></button>
+        <button class="btn chico no-print" onclick="abrirDocRT('${c.id}','${d.id}')">Ver</button><button class="btn chico peligro no-print" onclick="quitarDocRT('${c.id}','${d.id}')" aria-label="Quitar ${esc(d.nombre)}">Quitar</button></li>`).join('')}</ul>`
+        : '<p class="sec" style="margin:.25rem 0 .75rem">Todavía no hay documentos. Sube el certificado en PDF o foto.</p>'}
+      <div class="acciones no-print">
+        <label class="btn chico cta">${ic('plus')}Subir documento<input type="file" accept="application/pdf,image/*" hidden onchange="subirDocRT(this,'${c.id}')"></label>
+        <button class="btn chico" onclick="dlgFechaRT('${c.id}')">Cambiar vencimiento</button>
+      </div>
     </section>
     <section class="tarjeta borde-${h.e}">
       <h2>Horómetro</h2>
@@ -1124,20 +1141,19 @@ VISTAS.camion = id => {
       <div class="barra ${h.e}" role="img" aria-label="${Math.floor(h.pct)}% del límite usado"><span style="width:${Math.min(100, h.pct)}%"></span></div>
       <div class="chips" style="margin-bottom:.5rem">${chip(h.e, h.txt)}</div>
       <p class="sec" style="margin:0 0 .75rem">${h.pct >= 100 ? 'Ya superó el límite.' : h.dias != null ? `Usa en promedio <b>${n1(h.prom)} h por día</b>. Le quedan <b>${n0(h.resta)} h</b>: llegaría al límite cerca del <b>${fecha(h.fechaLim)}</b>.` : `Le quedan <b>${n0(h.resta)} h</b>. Sin uso reciente para proyectar.`}</p>
-      <form class="no-print" onsubmit="registrarDueno(event,'${c.id}')">
-        <label class="campo" style="margin-bottom:.5rem">Nueva lectura del horómetro
-          <input name="lectura" inputmode="decimal" autocomplete="off" placeholder="Ej.: ${n0(Math.floor(h.actual) + 8)}" aria-describedby="ayudaH${c.id}"></label>
-        <p id="ayudaH${c.id}" class="ayuda" style="margin:0 0 .5rem">Debe ser igual o mayor que ${n1(h.actual)} h.</p>
-        <button class="btn chico cta">${ic('gauge')}Registrar horómetro</button>
-      </form>
+      <div class="acciones no-print">
+        <button class="btn chico cta" onclick="dlgRegistrar('${c.id}')">${ic('gauge')}Registrar horómetro</button>
+        <button class="btn chico" onclick="dlgLimite('${c.id}')">${ic('sliders')}Editar límite y alertas</button>
+      </div>
       ${REAL ? `<p class="ayuda" style="margin:.5rem 0 0">También por WhatsApp${WSP_NUMERO ? ' al ' + esc(WSP_NUMERO) : ''}: <b>${esc(c.patente)} ${n0(Math.floor(h.actual))}</b></p>` : ''}
     </section>
   </div>
   ${(() => { const m = estadoMant(c); return `<section class="tarjeta borde-${m.e}">
-    <div class="titulo-tarjeta"><h2>Mantención cada ${n0(S.config.intervaloMant)} h</h2>${chip(m.e, m.txt)}</div>
-    <p style="margin:0">Próxima a las <b class="num">${n0(m.prox)} h</b>${m.fechaProx ? ` · aprox. el <b>${fecha(m.fechaProx)}</b>` : ''}</p>
-    <p class="sec" style="margin:.25rem 0 .75rem">Última: ${m.ultima ? `<b>${n0(m.ultima.valor)} h</b>${m.ultima.fecha ? ' (' + fecha(m.ultima.fecha) + ')' : ''}` : `${n0(m.base)} h (estimada, no hay mantención registrada)`}</p>
-    <button class="btn chico no-print" onclick="registrarMant('${c.id}')">${ic('check')}Registrar mantención hecha</button>
+    <div class="titulo-tarjeta"><h2>Próxima mantención</h2>${chip(m.e, m.txt)}</div>
+    <p style="margin:0">Le toca cuando el horómetro marque <b class="num">${n0(m.prox)} h</b>. Hoy marca <b class="num">${n1(h.actual)} h</b>.</p>
+    <p class="sec" style="margin:.25rem 0 .75rem">Se hace cada ${n0(S.config.intervaloMant)} h. Última: ${m.ultima ? `<b>${n0(m.ultima.valor)} h</b>${m.ultima.fecha ? ' (' + fecha(m.ultima.fecha) + ')' : ''}` : `${n0(m.base)} h (estimada, no hay ninguna anotada)`}.</p>
+    <button class="btn chico no-print" onclick="registrarMant('${c.id}')">${ic('check')}Ya se hizo la mantención</button>
+    <p class="ayuda no-print" style="margin:.5rem 0 0">Al marcarla, la cuenta parte de nuevo.</p>
   </section>`; })()}
   ${k ? `<section class="tarjeta">
     <h2>Horas de motor por día</h2>
@@ -1193,19 +1209,120 @@ async function registrarDueno(ev, id) {
   const error = txt.trim() ? validarLectura(c, v) : 'Escribe el número del horómetro, solo con números.';
   if (error) { toast(error); ev.target.lectura.focus(); return; }
   if (REAL) {
-    const btn = ev.target.querySelector('button'); btn.disabled = true;
+    const btn = ev.target.querySelector('button:not([type=button])'); btn.disabled = true;
     try {
       if (!(await sesionVigente())) return sesionPerdida();
       const res = await fetch(`${SUPA_URL}/rest/v1/rpc/registrar_lectura`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_patente: c.patente, p_valor: v }) });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
-      toast(`Horómetro registrado: ${n1(v)} h`); FIRMA = ''; await traerLecturas();
+      cerrarDlg(); toast(`Horómetro registrado: ${n1(v)} h`); FIRMA = ''; await traerLecturas();
       revisarAvisos(c.patente);
     } catch (e) { toast('No se pudo registrar: ' + e.message); btn.disabled = false; }
     return;
   }
   c.lecturas.push({ id: 'l' + Date.now(), fecha: Date.now(), valor: v, usuario: 'u0', foto: false, img: null, estado: 'validado', sync: 'enviado' });
-  guardar(); toast(`Horómetro registrado: ${n1(v)} h`); render();
+  cerrarDlg(); guardar(); toast(`Horómetro registrado: ${n1(v)} h`); render();
 }
+
+/* === Cuadros de la ficha del camión (v38): registrar horómetro, límite, revisión técnica y documentos === */
+function dialogo(html) {
+  const d = document.createElement('dialog'); d.className = 'dlg'; d.innerHTML = html;
+  d.addEventListener('close', () => d.remove());
+  document.body.appendChild(d); d.showModal(); return d;
+}
+function cerrarDlg() { document.querySelectorAll('dialog.dlg').forEach(d => d.close()); }
+const botonesDlg = (txt, cls = 'pri') => `<div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn ${cls}" style="flex:1">${txt}</button></div>`;
+function dlgRegistrar(id) {
+  const c = camion(id), h = estadoHoras(c);
+  dialogo(`<form onsubmit="registrarDueno(event,'${id}')"><h2>Registrar horómetro</h2>
+    <label class="campo" style="margin-bottom:.5rem">¿Cuánto marca ${fmtPatente(c.patente)}?
+      <input name="lectura" inputmode="decimal" autocomplete="off" placeholder="Ej.: ${n0(Math.floor(h.actual) + 8)}"></label>
+    <p class="ayuda" style="margin:0">Debe ser igual o mayor que ${n1(h.actual)} h.</p>
+    ${botonesDlg('Registrar', 'cta')}</form>`);
+}
+function dlgLimite(id) {
+  const c = camion(id), cfg = S.config;
+  dialogo(`<form onsubmit="guardarLimite(event,'${id}')"><h2>Límite de horas</h2>
+    <label class="campo" style="margin-bottom:.5rem">Límite de ${fmtPatente(c.patente)} (horas de motor)
+      <input name="limite" type="number" min="1" required inputmode="numeric" value="${c.limite}"></label>
+    <p class="ayuda" style="margin:0 0 .75rem">Avisa al ${cfg.pctAviso} % y al ${cfg.pctUrgente} % del límite. Mantención cada ${n0(cfg.intervaloMant)} h.</p>
+    <a href="#ajustes?tab=alertas" onclick="cerrarDlg()">Cambiar las alertas de toda la flota ›</a>
+    ${botonesDlg('Guardar')}</form>`);
+}
+async function guardarLimite(ev, id) {
+  ev.preventDefault();
+  const c = camion(id), v = Number(ev.target.limite.value);
+  if (!(v > 0)) { toast('Escribe un límite mayor que cero.'); return; }
+  if (REAL && v !== c.limite) {
+    const btn = ev.target.querySelector('button.pri'); btn.disabled = true;
+    try {
+      if (!(await sesionVigente())) return sesionPerdida();
+      const res = await fetch(`${SUPA_URL}/rest/v1/rpc/cambiar_limite`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_patente: c.patente, p_limite: v }) });
+      if (res.status === 404) throw new Error('falta activar esta función en Supabase (archivo v38)');
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || 'Error ' + res.status); }
+    } catch (e) { toast('No se pudo cambiar el límite: ' + e.message); btn.disabled = false; return; }
+  }
+  c.limite = v; guardar(); cerrarDlg(); toast('Límite guardado'); render();
+  if (REAL) setTimeout(() => revisarAvisos(c.patente), 2500);
+}
+function dlgFechaRT(id) {
+  const c = camion(id);
+  dialogo(`<form onsubmit="guardarFechaRT(event,'${id}')"><h2>Revisión técnica</h2>
+    <label class="campo" style="margin-bottom:0">¿Cuándo vence?<input name="rtVence" type="date" required value="${c.rtVence}"></label>
+    ${botonesDlg('Guardar')}</form>`);
+}
+function guardarFechaRT(ev, id) {
+  ev.preventDefault();
+  const c = camion(id); c.rtVence = ev.target.rtVence.value;
+  guardar(); cerrarDlg(); toast('Vencimiento guardado'); render();
+  if (REAL) setTimeout(() => revisarAvisos(c.patente), 2500);
+}
+// Documentos de la revisión técnica: con Supabase van al almacenamiento "documentos"; en modo de prueba, al navegador
+const DOC_MAX = 10 * 1024 * 1024, DOC_MAX_LOCAL = 400 * 1024;
+const rutaDoc = ruta => `${SUPA_URL}/storage/v1/object/documentos/${ruta.split('/').map(encodeURIComponent).join('/')}`;
+async function subirDocRT(inp, id) {
+  const f = inp.files[0], c = camion(id); inp.value = '';
+  if (!f) return;
+  if (!/^(application\/pdf|image\/)/.test(f.type)) { toast('Sube un PDF o una foto.'); return; }
+  if (f.size > (REAL ? DOC_MAX : DOC_MAX_LOCAL)) { toast(REAL ? 'El archivo pesa más de 10 MB.' : 'En modo de prueba, el archivo debe pesar menos de 400 KB.'); return; }
+  const doc = { id: 'd' + Date.now(), nombre: f.name, tipo: f.type, fecha: Date.now() };
+  toast('Subiendo documento…');
+  try {
+    if (REAL) {
+      if (!(await sesionVigente())) return sesionPerdida();
+      doc.ruta = `${c.patente}/${doc.id}-${f.name.normalize('NFD').replace(/[^\w.-]+/g, '_').slice(-60)}`;
+      const res = await fetch(rutaDoc(doc.ruta), { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': f.type }, body: f });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(/bucket/i.test(e.message || '') ? 'falta activar el almacenamiento en Supabase (archivo v38)' : e.message || 'Error ' + res.status); }
+    } else {
+      doc.data = await new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = mal; r.readAsDataURL(f); });
+    }
+  } catch (e) { toast('No se pudo subir: ' + e.message); return; }
+  c.docsRT = [...(c.docsRT || []), doc]; guardar(); toast('Documento guardado'); render();
+}
+async function abrirDocRT(id, did) {
+  const d = (camion(id).docsRT || []).find(x => x.id === did); if (!d) return;
+  const w = window.open('', '_blank'); // se abre antes de descargar para que el navegador no lo bloquee
+  try {
+    let blob;
+    if (d.ruta) {
+      if (!(await sesionVigente())) { if (w) w.close(); return sesionPerdida(); }
+      const res = await fetch(rutaDoc(d.ruta).replace('/object/', '/object/authenticated/'), { headers: supaHeaders() });
+      if (!res.ok) throw new Error('Error ' + res.status);
+      blob = await res.blob();
+    } else blob = await (await fetch(d.data)).blob();
+    const url = URL.createObjectURL(new Blob([blob], { type: d.tipo }));
+    if (w) w.location = url; else location.href = url;
+  } catch (e) { if (w) w.close(); toast('No se pudo abrir el documento.'); }
+}
+function quitarDocRT(id, did) {
+  const c = camion(id), d = (c.docsRT || []).find(x => x.id === did); if (!d) return;
+  window._quitarDoc = () => {
+    if (d.ruta) fetch(rutaDoc(d.ruta), { method: 'DELETE', headers: supaHeaders() }).catch(() => null);
+    c.docsRT = c.docsRT.filter(x => x.id !== did); guardar(); cerrarDlg(); toast('Documento quitado'); render();
+  };
+  dialogo(`<h2>¿Quitar este documento?</h2><p class="sec" style="margin:0">${esc(d.nombre)}</p>
+    <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="_quitarDoc()">Quitar</button></div>`);
+}
+/* === fin cuadros de la ficha === */
 
 /* ============ Dueño: Contratos ============ */
 VISTAS.contratos = () => {
@@ -1890,7 +2007,7 @@ VISTAS.editar = id => {
     <label class="campo">Horómetro de la última mantención <span class="ayuda">(opcional; si no se sabe, se estima)</span><input name="ultMant" type="number" min="0" step="0.1" inputmode="decimal"></label>
     <label class="campo">¿Qué día se leyó? <span class="ayuda">(desde ahí se cuentan las horas para el próximo registro)</span><input name="fechaLectura" type="date" required max="${isoLocal(Date.now())}" value="${isoLocal(Date.now())}"></label>
     ${REAL ? '<p class="ayuda">Al guardar, el camión queda listo para registrar su horómetro por WhatsApp con su patente y el número.</p>' : ''}` : ''}
-    <div class="acciones"><button class="btn pri" style="flex:1">Guardar</button>${nuevo ? '' : `<button type="button" class="btn peligro" onclick="quitarCamion('${id}')">Quitar de la flota</button>`}</div>
+    <div class="acciones"><button class="btn pri" style="flex:1">Guardar</button>${nuevo ? '' : `<button type="button" class="btn peligro" onclick="quitarCamion('${id}')">Eliminar camión</button>`}</div>
   </form>`;
 };
 async function guardarCamion(ev, id) {
@@ -1921,14 +2038,22 @@ async function guardarCamion(ev, id) {
     if (REAL) setTimeout(() => revisarAvisos(datos.patente), 2500); // espera a que el cambio se suba a Supabase
   }
 }
-async function quitarCamion(id) {
+function quitarCamion(id) {
+  const c = camion(id), k = contrato(c.contratoId);
+  dialogo(`<h2>¿Eliminar ${fmtPatente(c.patente)}?</h2>
+    <p style="margin:0">Se borra el camión con todos sus registros y documentos. <b>No se puede deshacer.</b></p>
+    ${k ? `<p class="sec" style="margin:.5rem 0 0">Hoy está arrendado a ${esc(k.empresa)}.</p>` : ''}
+    <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="eliminarCamion('${id}')">Sí, eliminar</button></div>`);
+}
+async function eliminarCamion(id) {
   const c = camion(id);
-  if (!confirm(`¿Quitar ${fmtPatente(c.patente)} de la flota? Se borran también sus registros.`)) return;
+  cerrarDlg();
   if (REAL) {
     const res = await fetch(`${SUPA_URL}/rest/v1/rpc/quitar_camion`, { method: 'POST', headers: { ...supaHeaders(), 'Content-Type': 'application/json' }, body: JSON.stringify({ p_patente: c.patente }) }).catch(() => null);
-    if (!res || !res.ok) { toast('No se pudo quitar. Revisa la conexión.'); return; }
+    if (!res || !res.ok) { toast('No se pudo eliminar. Revisa la conexión.'); return; }
+    (c.docsRT || []).forEach(d => d.ruta && fetch(rutaDoc(d.ruta), { method: 'DELETE', headers: supaHeaders() }).catch(() => null));
   }
-  S.camiones = S.camiones.filter(x => x.id !== id); guardar(); toast('Camión quitado'); ir('flota');
+  S.camiones = S.camiones.filter(x => x.id !== id); guardar(); toast('Camión eliminado'); ir('flota');
 }
 
 /* ============ Empleado ============ */
