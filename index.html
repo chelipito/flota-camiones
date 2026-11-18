@@ -967,7 +967,7 @@ function cobro(v) {
 }
 function chipVenta(v) {
   if (v.estado === 'pagado') return estado('ok', 'Pagada');
-  if (v.estado === 'facturado') { const c = cobro(v); return c.e === 'ok' ? estado('sinreporte', 'Por cobrar') : estado(c.e, c.txt); }
+  if (v.estado === 'facturado') { const c = cobro(v); return c.e === 'ok' ? estado('sinreporte', 'Facturada') : estado(c.e, c.txt); }
   return v.estado === 'en revision' ? estado('porvencer', 'En revisión') : estado('sinreporte', 'Por facturar');
 }
 const esTercero = v => vCosto(v) > 0;
