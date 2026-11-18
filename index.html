@@ -576,7 +576,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '56'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '57'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -647,11 +647,11 @@ const TABLAS = {
   clientes: [['id', 'id'], ['nombre', 'nombre'], ['contacto', 'contacto'], ['telefono', 'telefono'], ['correo', 'correo'], ['plazoPago', 'plazo_pago', 'n']],
   ventas: [['id', 'id'], ['mes', 'mes'], ['area', 'area'], ['cliente', 'cliente'], ['oc', 'oc'], ['edp', 'edp'], ['equipos', 'equipos'], ['desde', 'desde', 'f'], ['hasta', 'hasta', 'f'], ['neto', 'neto', 'n'],
     ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen'], ['hes', 'hes'], ['mesFacturacion', 'mes_facturacion'], ['lineas', 'lineas', 'j']],
-  compras: [['id', 'id'], ['proveedor', 'proveedor'], ['factura', 'factura'], ['fecha', 'fecha', 'f'], ['vence', 'vence', 'f'], ['neto', 'neto', 'n'], ['estado', 'estado'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas']],
+  compras: [['id', 'id'], ['proveedor', 'proveedor'], ['factura', 'factura'], ['fecha', 'fecha', 'f'], ['vence', 'vence', 'f'], ['neto', 'neto', 'n'], ['estado', 'estado'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['mesServicio', 'mes_servicio'], ['abonado', 'abonado', 'n']],
   leasing: [['id', 'id'], ['equipo', 'equipo'], ['valor', 'valor', 'n'], ['pie', 'pie', 'n'], ['plazo', 'plazo', 'n'], ['tasa', 'tasa', 'n'], ['vf', 'vf', 'n'], ['arriendo', 'arriendo', 'n'], ['inicio', 'inicio', 'f']],
 };
 let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null, FALTAN = new Set(); // FALTAN: columnas opcionales de ventas que la base aún no tiene (lineas, hes y mes de facturación; supabase/v46-mes-facturacion.sql)
-const COL_OPC = ['lineas', 'hes', 'mesFacturacion'];
+const COL_OPC = { ventas: ['lineas', 'hes', 'mesFacturacion'], compras: ['mesServicio', 'abonado'] };
 const TABLAS_OPC = ['compras'], TABLAS_SIN = new Set(); // tablas nuevas que pueden no existir aún (v47-compras.sql): si faltan, esa lista sigue en el registro compartido
 const tablasActivas = () => Object.keys(TABLAS).filter(t => !TABLAS_SIN.has(t));
 const valorFila = (v, tipo) => tipo === 'j' ? (v ?? null) : tipo === 'f' ? (v || null) : tipo === 'n' ? (v === '' || v == null || isNaN(Number(v)) ? null : Number(v)) : (v ?? '');
@@ -676,7 +676,7 @@ async function bajarTablas() { // devuelve true si llegaron cambios hechos en ot
     if (filas === null) { if (TABLAS_OPC.includes(t)) { TABLAS_SIN.add(t); continue; } TABLAS_OK = false; return false; } // sin tablas: modo anterior
     TABLAS_SIN.delete(t);
     nuevo[t] = filas.map(r => deFila(t, r));
-    if (t === 'ventas' && filas.length) COL_OPC.forEach(c => { if (TABLAS.ventas.find(x => x[0] === c)[1] in filas[0]) FALTAN.delete(c); else FALTAN.add(c); });
+    if (COL_OPC[t] && filas.length) COL_OPC[t].forEach(c => { if (TABLAS[t].find(x => x[0] === c)[1] in filas[0]) FALTAN.delete(c); else FALTAN.add(c); });
   }
   TABLAS_OK = true;
   let cambio = false;
@@ -707,9 +707,9 @@ function subirTablas() {
           const res = await fetch(`${SUPA_URL}/rest/v1/${t}`, { method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(lote) });
           if (res.status === 401) { TSUBIDA = null; return sesionPerdida(); }
           if (!res.ok) {
-            const falta = t === 'ventas' ? (await res.text()).match(/'(\w+)' column/) : null;
-            const js = falta && (TABLAS.ventas.find(x => x[1] === falta[1]) || [])[0];
-            if (js && COL_OPC.includes(js) && !FALTAN.has(js)) { FALTAN.add(js); toast('Falta ejecutar v46-mes-facturacion.sql en Supabase para guardar todos los datos de cada servicio.'); TSUBIDA = null; subirTablas(); return; }
+            const falta = COL_OPC[t] ? (await res.text()).match(/'(\w+)' column/) : null;
+            const js = falta && (TABLAS[t].find(x => x[1] === falta[1]) || [])[0];
+            if (js && COL_OPC[t].includes(js) && !FALTAN.has(js)) { FALTAN.add(js); toast(t === 'ventas' ? 'Falta ejecutar v46-mes-facturacion.sql en Supabase para guardar todos los datos de cada servicio.' : 'Falta ejecutar v47-compras.sql en Supabase para guardar el mes de servicio y los pagos parciales.'); TSUBIDA = null; subirTablas(); return; }
             throw new Error('HTTP ' + res.status);
           }
         }
@@ -1086,10 +1086,10 @@ VISTAS.finanzas = (_, q) => {
   const ms = mesesConDatos(), mes = q.get('mes') || ms[ms.length - 1] || ymHoy();
   const anio = q.get('anio') || mes.slice(0, 4);
   const pest = (k, t) => `<a class="btn chico" href="#finanzas?tab=${k}&mes=${mes}" aria-pressed="${tab === k}">${t}</a>`;
-  const cuerpo = tab === 'caja' ? vistaCaja(anio, q) : tab === 'cobrar' ? vistaCobrar(q) : tab === 'mes' ? vistaMes(mes, ms) : tab === 'proveedores' ? vistaProveedores(q) : vistaResumen(anio);
+  const cuerpo = tab === 'caja' ? vistaCaja(anio, q) : tab === 'cobrar' ? vistaCobrar(q) : tab === 'mes' ? vistaMes(mes, ms) : tab === 'proveedores' ? vistaProveedores(mes) : vistaResumen(anio);
   return `
   <div class="cab"><div><h1>Ventas y caja</h1><p class="sec" style="margin:0">Cuánto se vende, cuánto se cobra y cuánto queda.</p></div>
-    ${tab === 'proveedores' ? `<button class="btn chico cta no-print" onclick="dlgCompra('nuevo')">${ic('plus')}Nueva factura</button>` : `<button class="btn chico cta no-print" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Nuevo servicio</button>`}</div>
+    ${tab === 'proveedores' ? `<button class="btn chico cta no-print" onclick="dlgCompra('nuevo','${mes}')">${ic('plus')}Nueva factura de proveedor</button>` : tab === 'mes' ? `<button class="btn chico cta no-print" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Nuevo servicio</button>` : ''}</div>
   <nav class="filtros no-print" aria-label="Secciones">${pest('caja', 'Caja')}${pest('cobrar', 'Por cobrar')}${pest('mes', 'Servicios')}${pest('proveedores', 'Proveedores')}${pest('resumen', 'Resumen del año')}</nav>
   ${cuerpo}
   ${tab === 'proveedores' ? '' : `<div class="acciones no-print" style="margin:4px 0 16px"><button class="btn chico" onclick="dlgImportar()">${ic('download')}Importar Excel</button>${tab === 'mes' ? `<button class="btn chico" onclick="exportarVentas('${mes}')">${ic('download')}Exportar este mes</button>` : ''}<button class="btn chico" onclick="exportarVentas()">${ic('download')}Exportar el año a Excel</button></div>`}`;
@@ -1131,7 +1131,7 @@ function vistaCaja(anio, q) {
     <div class="fila entre" style="padding:.35rem 0;border-top:1px solid var(--borde)"><span>Por cobrar</span><b class="num">${peso(porCobrar)}</b></div>
     <div class="fila entre" style="padding:.35rem 0;border-top:1px solid var(--borde)"><span>De eso, atrasado</span><b class="num" style="${vencido ? 'color:var(--ur-t)' : ''}">${peso(vencido)}</b></div>
     <a href="#finanzas?tab=cobrar" style="display:inline-block;margin-top:.5rem">Ver facturas por cobrar ›</a>
-    ${compras().length ? `<div class="fila entre" style="padding:.35rem 0;margin-top:.5rem;border-top:1px solid var(--borde)"><span>Por pagar a proveedores <span class="sec">(con IVA)</span></span><b class="num">${peso(sumar(compras().filter(c => c.estado !== 'pagada'), cTotal))}</b></div>
+    ${compras().length ? `<div class="fila entre" style="padding:.35rem 0;margin-top:.5rem;border-top:1px solid var(--borde)"><span>Por pagar a proveedores <span class="sec">(con IVA)</span></span><b class="num">${peso(sumar(compras(), cDebe))}</b></div>
     <a href="#finanzas?tab=proveedores" style="display:inline-block;margin-top:.25rem">Ver facturas de proveedores ›</a>` : ''}
   </section>
   <section class="tarjeta">
@@ -1152,8 +1152,13 @@ function vistaCaja(anio, q) {
 /* === Proveedores (v47): facturas recibidas, lo que hay que pagar === */
 const compras = () => S.compras || (S.compras = []);
 const cNeto = c => Number(c.neto) || 0, cTotal = c => Math.round(cNeto(c) * 1.19);
+// Estado de pago: 'pendiente' (por pagar), 'parcial' (con abono) o 'pagada'. El abono se anota con IVA.
+const cPagado = c => c.estado === 'pagada' ? cTotal(c) : c.estado === 'parcial' ? Math.min(Number(c.abonado) || 0, cTotal(c)) : 0;
+const cDebe = c => cTotal(c) - cPagado(c);
+const mesFactura = c => (c.fecha || '').slice(0, 7) || c.mesServicio || ymHoy();
+const mesServicioC = c => c.mesServicio || mesFactura(c);
 const venceCompra = c => c.vence || (c.fecha ? sumaDias(c.fecha, S.config.plazoPagoDias || 30) : null);
-// Pago de una factura recibida: vence = fecha indicada, o fecha de factura + plazo normal
+// Vence = fecha indicada, o fecha de factura + plazo normal
 function pagoProv(c) {
   const f = venceCompra(c);
   if (c.estado === 'pagada') return { e: 'ok', d: null, txt: 'Pagada', vence: f };
@@ -1165,91 +1170,76 @@ function pagoProv(c) {
   else if (d <= (cfg.diasFacturaAviso ?? 7)) e = 'porvencer';
   return { e, d, txt, vence: f };
 }
-function vistaProveedores(q) {
-  const todas = compras().map(c => ({ c, p: pagoProv(c), m: (c.fecha || '').slice(0, 7) }))
-    .sort((a, b) => (a.c.estado === 'pagada') - (b.c.estado === 'pagada') || (a.c.estado === 'pagada' ? (b.c.fecha || '').localeCompare(a.c.fecha || '') : (a.p.vence || '9999').localeCompare(b.p.vence || '9999')));
-  const fm = q.get('pmes') || '', fp = q.get('pprov') || '', fe = q.get('pest') || '';
-  const meses = [...new Set(todas.map(x => x.m).filter(Boolean))].sort(), provs = [...new Set(todas.map(x => x.c.proveedor))].sort((a, b) => a.localeCompare(b, 'es'));
-  const ESTADOS = [['', 'Todas'], ['pendiente', 'Por pagar'], ['atrasada', 'Atrasadas'], ['pagada', 'Pagadas']];
-  const pasa = x => (!fm || x.m === fm) && (!fp || x.c.proveedor === fp) && (!fe || (fe === 'pagada' ? x.c.estado === 'pagada' : x.c.estado !== 'pagada' && (fe === 'pendiente' || (x.p.d != null && x.p.d < 0))));
-  const fact = todas.filter(pasa), pend = fact.filter(x => x.c.estado !== 'pagada'), venc = pend.filter(x => x.p.d != null && x.p.d < 0), hayFiltro = fm || fp || fe;
-  const sel = (id, t, ops, val) => `<label class="campo" style="margin-bottom:8px">${t}<select id="${id}" onchange="filtrarProv()">${ops.map(([v, n]) => `<option value="${esc(v)}" ${v === val ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>`;
+const chipCompra = c => c.estado === 'pagada' ? estado('ok', 'Pagado') : c.estado === 'parcial' ? estado('porvencer', 'Pago parcial') : estado('sinreporte', 'Por pagar');
+function vistaProveedores(mes) {
+  const lista = [...new Set([...compras().map(mesFactura), mes])].sort();
+  const cs = compras().filter(c => mesFactura(c) === mes).sort((a, b) => a.proveedor.localeCompare(b.proveedor, 'es') || (a.factura || '').localeCompare(b.factura || ''));
   const aviso = TABLAS_OK && TABLAS_SIN.has('compras') ? `<div class="aviso-nar-caja" style="margin-bottom:12px">Falta ejecutar <b>v47-compras.sql</b> en Supabase. Mientras tanto las facturas se guardan en el registro compartido y no se pierden.</div>` : '';
-  if (!todas.length) return `${aviso}<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay facturas de proveedores.</p><button class="btn cta" onclick="dlgCompra('nuevo')">${ic('plus')}Agregar la primera</button></div>`;
+  const total = sumar(cs, cTotal), pagado = sumar(cs, cPagado);
   return `${aviso}
-  <section class="tarjeta" style="padding:12px 14px;margin-bottom:12px">
-    <div class="grid grid-3">
-      ${sel('fpMes', 'Mes de la factura', [['', 'Todos los meses'], ...meses.map(m => [m, nombreMes(m)])], fm)}
-      ${sel('fpProv', 'Proveedor', [['', 'Todos'], ...provs.map(c => [c, c])], fp)}
-      ${sel('fpEst', 'Estado', ESTADOS, fe)}
-    </div>
-    <p class="ayuda" style="margin:0">${hayFiltro ? `Mostrando ${fact.length} de ${todas.length} facturas. <a href="#finanzas?tab=proveedores">Quitar filtros</a>` : `${todas.length} ${todas.length === 1 ? 'factura recibida' : 'facturas recibidas'}.`}</p>
-  </section>
+  <label class="campo" style="margin-bottom:12px">Mes de la factura<select onchange="location.hash='finanzas?tab=proveedores&mes='+this.value">${lista.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nombreMes(m)}</option>`).join('')}</select></label>
   <div class="kpis k3">
-    ${kpi('', fact.length, 'Facturas', 'file')}
-    ${kpiM('', pesoCorto(sumar(pend, x => cTotal(x.c))), 'Por pagar', 'dollar')}
-    ${kpiM(venc.length ? 'urgente' : '', pesoCorto(sumar(venc, x => cTotal(x.c))), 'Atrasado', 'alert')}
+    ${kpiM('', pesoCorto(total), 'Facturado', 'dollar')}
+    ${kpiM('ok', pesoCorto(pagado), 'Pagado', 'check')}
+    ${kpiM(total - pagado ? 'urgente' : '', pesoCorto(total - pagado), 'Por pagar', 'clock')}
   </div>
-  ${fact.length ? `<div class="lista" style="--cols:minmax(0,1.5fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr) 24px">
-    <div class="lista-cab"><span>Proveedor</span><span>Factura</span><span>Total</span><span>Fecha</span><span>Estado</span><span></span></div>
-    ${fact.map(({ c, p }) => `<a class="lista-fila" href="#finanzas?tab=proveedores" role="button" onclick="dlgCompra('${c.id}');return false">
-      <span class="celda-pri"><b>${esc(c.proveedor)}</b><span class="sub">Factura ${esc(c.factura || 's/n')} · ${peso(cTotal(c))}<span class="solo-movil">${c.fecha ? ' · ' + fecha(dISO(c.fecha)) : ''}</span></span></span>
-      <span class="opc">${esc(c.factura || 's/n')}</span>
-      <span class="opc num">${peso(cTotal(c))}</span>
-      <span class="opc">${c.fecha ? fecha(dISO(c.fecha)) : '—'}</span>
-      <span>${c.estado === 'pagada' ? estado('ok', 'Pagada') : p.e === 'ok' ? estado('sinreporte', 'Por pagar') : estado(p.e, p.txt)}<span class="sub opc-sub">${p.vence && c.estado !== 'pagada' ? 'vence ' + fecha(dISO(p.vence)) : ''}</span></span>
+  ${cs.length ? `<div class="lista" style="--cols:minmax(0,1.5fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) minmax(0,1.2fr) 24px">
+    <div class="lista-cab"><span>Proveedor</span><span>Mes de factura</span><span>Mes de servicio</span><span>Monto de la factura</span><span>Estado</span><span></span></div>
+    ${cs.map(c => `<a class="lista-fila" href="#finanzas?tab=proveedores" role="button" onclick="dlgCompra('${c.id}');return false">
+      <span class="celda-pri"><b>${esc(c.proveedor)}</b><span class="sub">Factura ${esc(c.factura || 's/n')}<span class="solo-movil"> · servicio ${esc(MESES[+mesServicioC(c).slice(5, 7) - 1].toLowerCase())} · factura ${esc(MESES[+mesFactura(c).slice(5, 7) - 1].toLowerCase())}</span></span></span>
+      <span class="opc"><b>${esc(nombreMes(mesFactura(c)))}</b></span>
+      <span class="opc">${esc(nombreMes(mesServicioC(c)))}</span>
+      <span class="opc num"><b>${peso(cTotal(c))}</b></span>
+      <span class="num-estado"><b class="num solo-movil-bloque">${pesoCorto(cTotal(c))}</b>${chipCompra(c)}${c.estado === 'parcial' ? `<span class="sub opc-sub">falta ${peso(cDebe(c))}</span>` : c.estado !== 'pagada' && pagoProv(c).e === 'vencido' ? `<span class="sub opc-sub" style="color:var(--ur-t)">${pagoProv(c).txt}</span>` : ''}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
+    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc"></span><span class="opc num">${peso(total)}</span><span class="solo-movil-bloque num">${pesoCorto(total)}</span><span class="opc"></span></div>
   </div>
-  <p class="ayuda">Toca una factura para editarla o marcarla como pagada. Valores con IVA 19 %. Vence = fecha indicada, o fecha de factura + ${S.config.plazoPagoDias || 30} días.</p>`
-  : `<div class="tarjeta vacio">No hay facturas con esos filtros.</div>`}`;
+  <p class="ayuda">Valores con IVA 19 %. Toca una factura para editarla, registrar un pago parcial o marcarla como pagada.</p>`
+  : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">No hay facturas de proveedores en ${nombreMes(mes)}.</p><button class="btn cta" onclick="dlgCompra('nuevo','${mes}')">${ic('plus')}Agregar la primera</button></div>`}`;
 }
-function filtrarProv() {
-  const g = id => encodeURIComponent($('#' + id).value);
-  location.hash = `finanzas?tab=proveedores&pmes=${g('fpMes')}&pprov=${g('fpProv')}&pest=${g('fpEst')}`;
-}
-function dlgCompra(id) {
-  const nuevo = id === 'nuevo', c = nuevo ? { proveedor: '', factura: '', fecha: isoLocal(Date.now()), vence: '', neto: '', estado: 'pendiente', fechaPago: '', notas: '' } : compras().find(x => x.id === id);
+function dlgCompra(id, mesPre) {
+  const nuevo = id === 'nuevo', hoy = isoLocal(Date.now()), mp = mesPre || ymHoy();
+  const c = nuevo ? { proveedor: '', factura: '', fecha: mp === ymHoy() ? hoy : mp + '-01', vence: '', neto: '', estado: 'pendiente', abonado: '', fechaPago: '', notas: '', mesServicio: mp } : compras().find(x => x.id === id);
   if (!c) return;
-  dialogo(`<form class="ancho-f" onsubmit="guardarCompra(event,'${id}')"><h2>${nuevo ? 'Nueva factura recibida' : 'Factura recibida'}</h2>
+  dialogo(`<form class="ancho-f" onsubmit="guardarCompra(event,'${id}')"><h2>${nuevo ? 'Nueva factura de proveedor' : 'Factura de proveedor'}</h2>
     <p class="ayuda" id="prevCompra" aria-live="polite" style="margin:0 0 10px"></p>
     <label class="campo" style="margin-bottom:10px">Proveedor<input name="proveedor" required list="lsProv" value="${esc(c.proveedor)}" autocomplete="off"></label>
     <datalist id="lsProv">${[...new Set(compras().map(x => x.proveedor))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
     <label class="campo" style="margin-bottom:10px">N° de factura<input name="factura" value="${esc(c.factura)}" inputmode="numeric"></label>
     <div class="grid grid-2">
       <label class="campo" style="margin-bottom:10px">Fecha de factura<input name="fecha" type="date" required value="${c.fecha || ''}"></label>
-      <label class="campo" style="margin-bottom:10px">Vence <span class="ayuda">(opcional)</span><input name="vence" type="date" value="${c.vence || ''}"></label>
+      <label class="campo" style="margin-bottom:10px">Mes de servicio<input name="mesServicio" type="month" required value="${mesServicioC(c)}"></label>
     </div>
     <label class="campo" style="margin-bottom:10px">Monto neto ($)<input name="neto" type="number" min="0" step="any" inputmode="decimal" required value="${c.neto ?? ''}" oninput="prevCompra(this.form)"></label>
+    <label class="campo" style="margin-bottom:10px">Estado de la factura<select name="estado" onchange="prevCompra(this.form)"><option value="pendiente" ${c.estado === 'pendiente' || !c.estado ? 'selected' : ''}>Por pagar</option><option value="parcial" ${c.estado === 'parcial' ? 'selected' : ''}>Pago parcial</option><option value="pagada" ${c.estado === 'pagada' ? 'selected' : ''}>Pagado</option></select></label>
+    <label class="campo" id="cAbono" style="margin-bottom:10px">Monto ya pagado, con IVA ($)<input name="abonado" type="number" min="0" step="any" inputmode="decimal" value="${c.abonado ?? ''}" oninput="prevCompra(this.form)"></label>
     <div class="grid grid-2">
-      <label class="campo" style="margin-bottom:10px">Estado<select name="estado"><option value="pendiente" ${c.estado !== 'pagada' ? 'selected' : ''}>Por pagar</option><option value="pagada" ${c.estado === 'pagada' ? 'selected' : ''}>Pagada</option></select></label>
+      <label class="campo" style="margin-bottom:10px">Vence <span class="ayuda">(opcional)</span><input name="vence" type="date" value="${c.vence || ''}"></label>
       <label class="campo" style="margin-bottom:10px">Fecha de pago<input name="fechaPago" type="date" value="${c.fechaPago || ''}"></label>
     </div>
     <label class="campo" style="margin-bottom:10px">Observaciones<textarea name="notas" rows="2">${esc(c.notas || '')}</textarea></label>
     <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
-    ${nuevo || c.estado === 'pagada' ? '' : `<button type="button" class="btn" style="width:100%;margin-top:8px" onclick="pagarCompra('${id}')">Marcar como pagada hoy</button>`}
     ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarCompra('${id}')">Eliminar factura</button>`}</form>`)
     .classList.add('ancho');
   prevCompra(document.querySelector('dialog.dlg form'));
 }
 function prevCompra(f) {
-  const n = Number(f.neto.value) || 0, box = $('#prevCompra');
-  if (box) box.innerHTML = n ? `Neto ${peso(n)} · IVA ${peso(Math.round(n * .19))} · <b>Total ${peso(Math.round(n * 1.19))}</b>` : 'Escribe el monto neto para ver el IVA y el total.';
+  const n = Number(f.neto.value) || 0, box = $('#prevCompra'), tot = Math.round(n * 1.19), parcial = f.estado.value === 'parcial', ab = Number(f.abonado.value) || 0;
+  $('#cAbono').style.display = parcial ? '' : 'none';
+  if (box) box.innerHTML = n ? `Neto ${peso(n)} · IVA ${peso(Math.round(n * .19))} · <b>Total ${peso(tot)}</b>${parcial && ab ? ` · falta ${peso(Math.max(0, tot - ab))}` : ''}` : 'Escribe el monto neto para ver el IVA y el total.';
 }
 function guardarCompra(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target)), hoy = isoLocal(Date.now());
-  const dato = { proveedor: d.proveedor.trim(), factura: d.factura.trim(), fecha: d.fecha, vence: d.vence || '', neto: Number(d.neto) || 0, estado: d.estado, fechaPago: d.fechaPago || '', notas: d.notas.trim() };
+  const dato = { proveedor: d.proveedor.trim(), factura: d.factura.trim(), fecha: d.fecha, mesServicio: d.mesServicio, vence: d.vence || '', neto: Number(d.neto) || 0, estado: d.estado, abonado: d.estado === 'parcial' ? Number(d.abonado) || 0 : null, fechaPago: d.fechaPago || '', notas: d.notas.trim() };
   if (!dato.proveedor) { toast('Falta el proveedor.'); return; }
   if (!(dato.neto > 0)) { toast('El monto neto debe ser mayor que cero.'); return; }
+  const tot = Math.round(dato.neto * 1.19);
+  if (dato.estado === 'parcial' && !(dato.abonado > 0 && dato.abonado < tot)) { toast('El pago parcial debe ser mayor que cero y menor que el total (' + peso(tot) + ').'); return; }
   if (dato.estado === 'pagada' && !dato.fechaPago) dato.fechaPago = hoy;
-  if (dato.estado !== 'pagada') dato.fechaPago = '';
+  if (dato.estado === 'pendiente') dato.fechaPago = '';
   if (id === 'nuevo') compras().push({ id: 'cp' + Date.now(), ...dato }); else Object.assign(compras().find(x => x.id === id), dato);
   guardar(); cerrarDlg(); toast('Factura guardada'); render();
-}
-function pagarCompra(id) {
-  const c = compras().find(x => x.id === id); if (!c) return;
-  c.estado = 'pagada'; c.fechaPago = isoLocal(Date.now());
-  guardar(); cerrarDlg(); toast('Pago registrado'); render();
 }
 function quitarCompra(id) {
   const c = compras().find(x => x.id === id); if (!c) return;
