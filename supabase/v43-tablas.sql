@@ -33,9 +33,11 @@ create table if not exists ventas (
   fecha_pago date,
   notas text not null default '',
   origen text not null default 'app',  -- app o excel
+  hes text not null default '',        -- N° HES
   lineas jsonb,                        -- equipos de la orden: [{id, equipo, neto, tercero, leasing}]
   creado timestamptz not null default now()
 );
+alter table ventas add column if not exists hes text not null default '';
 alter table ventas add column if not exists lineas jsonb;   -- por si la tabla ya existía sin esta columna
 create index if not exists ventas_mes on ventas (mes);
 create index if not exists ventas_estado on ventas (estado);
