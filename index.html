@@ -723,7 +723,7 @@ function estadoPlazo(d, urgente, aviso) {
   return { e, d, txt };
 }
 const estadoRT = c => c.rtVence ? estadoPlazo(diasHasta(dISO(c.rtVence)), S.config.diasUrgente, S.config.diasPorVencer) : { e: 'ok', d: null, txt: 'Sin fecha cargada' };
-const fechaRT = c => c.rtVence ? fechaRT(c) : 'Sin fecha';
+const fechaRT = c => c.rtVence ? fecha(dISO(c.rtVence)) : 'Sin fecha';
 const estadoContrato = k => estadoPlazo(diasHasta(dISO(k.termino)), S.config.diasContratoUrgente, S.config.diasContratoAviso);
 function promedioDiario(c) {
   const ls = lecturasOk(c); if (ls.length < 2) return 0;
