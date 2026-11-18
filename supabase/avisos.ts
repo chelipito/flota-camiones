@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
   if (!conSesion && !patente && tocaResumen && destinos.length) {
     (datos.contratos ?? []).forEach((k: any) => {
       const d = k.termino ? diasHasta(k.termino) : 999;
-      if (d <= (cfg.diasContratoAviso ?? 60)) pendientes.push(`${d <= (cfg.diasContratoUrgente ?? 15) ? '🔴' : '🟡'} Contrato ${k.empresa}: ${d < 0 ? 'terminó' : `termina en ${d} ${d === 1 ? 'día' : 'días'}`}.`);
+      if (d <= (cfg.diasContratoAviso ?? 60)) pendientes.push(`${d <= (cfg.diasContratoUrgente ?? 15) ? '🔴' : '🟡'} Orden de compra ${k.numero ? k.numero + ' · ' : ''}${k.empresa}: ${d < 0 ? 'terminó' : `termina en ${d} ${d === 1 ? 'día' : 'días'}`}.`);
     });
     const clave = `resumen|${hoyChile()}`;
     const texto = `📋 Resumen ${cfg.empresa ?? 'Control de Flota'} · ${fecha(Date.now())}\n` +
