@@ -576,7 +576,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '51'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '52'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1247,15 +1247,15 @@ function dlgVenta(id, mesPre) {
     ${t('oc', 'N° de orden de compra')}
     <div class="grid grid-2">${t('mes', 'Mes de servicio', 'month', 'required')}${t('mesFacturacion', 'Mes de facturación', 'month', 'required')}</div>
     <div class="grid grid-2">${t('desde', 'Desde', 'date')}${t('hasta', 'Hasta', 'date')}</div>
-    <h3 style="margin:.5rem 0">Equipos <span class="sec" style="font-weight:400;font-size:.9rem">(${ls.length === 1 && !v.lineas && /( y | - |,)/.test(v.equipos || '') ? 'este arriendo trae varios equipos juntos: sepáralos y reparte el monto' : 'monto neto de cada uno'})</span></h3>
-    <div id="lineas">${ls.map(filaLinea).join('')}</div>
-    <button type="button" class="btn chico" style="margin-bottom:12px" onclick="agregarLinea()">${ic('plus')}Agregar equipo</button>
     <label class="campo" style="margin-bottom:10px">Estado<select name="estado"><option value="pendiente">Por facturar</option><option value="en revision">En revisión</option><option value="facturado">Facturada</option><option value="pagado">Pagada</option></select></label>
     <div class="grid grid-2">${t('factura', 'N° de factura')}${t('fechaFactura', 'Fecha de factura', 'date')}</div>
     ${t('fechaPago', 'Fecha de pago <span class="ayuda">(cuando paguen)</span>', 'date')}
     ${t('edp', 'N° EDP <span class="ayuda">(estado de pago)</span>')}
     ${t('hes', 'N° HES')}
     <label class="campo" style="margin-bottom:0">Observaciones<textarea name="notas" rows="2">${esc(v.notas)}</textarea></label>
+    <h3 style="margin:1rem 0 .5rem">Equipos <span class="sec" style="font-weight:400;font-size:.9rem">(${ls.length === 1 && !v.lineas && /( y | - |,)/.test(v.equipos || '') ? 'este arriendo trae varios equipos juntos: sepáralos y reparte el monto' : 'monto neto de cada uno'})</span></h3>
+    <div id="lineas">${ls.map(filaLinea).join('')}</div>
+    <button type="button" class="btn chico" style="margin-bottom:12px" onclick="agregarLinea()">${ic('plus')}Agregar equipo</button>
     <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
     ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarVenta('${id}')">Eliminar servicio</button>`}</form>`);
   d.classList.add('ancho');
