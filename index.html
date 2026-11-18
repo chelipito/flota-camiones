@@ -572,7 +572,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '46'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '47'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -642,11 +642,11 @@ async function bajarEstado() { // devuelve true si llegaron cambios hechos en ot
 const TABLAS = {
   clientes: [['id', 'id'], ['nombre', 'nombre'], ['contacto', 'contacto'], ['telefono', 'telefono'], ['correo', 'correo'], ['plazoPago', 'plazo_pago', 'n']],
   ventas: [['id', 'id'], ['mes', 'mes'], ['area', 'area'], ['cliente', 'cliente'], ['oc', 'oc'], ['edp', 'edp'], ['equipos', 'equipos'], ['desde', 'desde', 'f'], ['hasta', 'hasta', 'f'], ['neto', 'neto', 'n'],
-    ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen'], ['hes', 'hes'], ['lineas', 'lineas', 'j']],
+    ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen'], ['hes', 'hes'], ['mesFacturacion', 'mes_facturacion'], ['lineas', 'lineas', 'j']],
   leasing: [['id', 'id'], ['equipo', 'equipo'], ['valor', 'valor', 'n'], ['pie', 'pie', 'n'], ['plazo', 'plazo', 'n'], ['tasa', 'tasa', 'n'], ['vf', 'vf', 'n'], ['arriendo', 'arriendo', 'n'], ['inicio', 'inicio', 'f']],
 };
-let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null, FALTAN = new Set(); // FALTAN: columnas opcionales de ventas que la base aún no tiene (lineas y hes; supabase/v45-hes.sql)
-const COL_OPC = ['lineas', 'hes'];
+let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null, FALTAN = new Set(); // FALTAN: columnas opcionales de ventas que la base aún no tiene (lineas, hes y mes de facturación; supabase/v46-mes-facturacion.sql)
+const COL_OPC = ['lineas', 'hes', 'mesFacturacion'];
 const valorFila = (v, tipo) => tipo === 'j' ? (v ?? null) : tipo === 'f' ? (v || null) : tipo === 'n' ? (v === '' || v == null || isNaN(Number(v)) ? null : Number(v)) : (v ?? '');
 const aFila = (t, o) => Object.fromEntries(TABLAS[t].filter(([js]) => !FALTAN.has(js)).map(([js, db, tipo]) => [db, valorFila(o[js], tipo)]));
 const deFila = (t, r) => Object.fromEntries(TABLAS[t].map(([js, db, tipo]) => [js, tipo === 'j' ? (r[db] ?? null) : tipo === 'f' ? (r[db] || '') : tipo === 'n' ? (r[db] == null ? null : Number(r[db])) : (r[db] ?? '')]));
@@ -668,7 +668,7 @@ async function bajarTablas() { // devuelve true si llegaron cambios hechos en ot
     const filas = await leerTabla(t);
     if (filas === null) { TABLAS_OK = false; return false; } // sin tablas: modo anterior
     nuevo[t] = filas.map(r => deFila(t, r));
-    if (t === 'ventas' && filas.length) COL_OPC.forEach(c => { if (c in filas[0]) FALTAN.delete(c); else FALTAN.add(c); });
+    if (t === 'ventas' && filas.length) COL_OPC.forEach(c => { if (TABLAS.ventas.find(x => x[0] === c)[1] in filas[0]) FALTAN.delete(c); else FALTAN.add(c); });
   }
   TABLAS_OK = true;
   let cambio = false;
@@ -698,7 +698,8 @@ function subirTablas() {
           if (res.status === 401) { TSUBIDA = null; return sesionPerdida(); }
           if (!res.ok) {
             const falta = t === 'ventas' ? (await res.text()).match(/'(\w+)' column/) : null;
-            if (falta && COL_OPC.includes(falta[1]) && !FALTAN.has(falta[1])) { FALTAN.add(falta[1]); toast('Falta ejecutar v45-hes.sql en Supabase para guardar todos los datos de cada servicio.'); TSUBIDA = null; subirTablas(); return; }
+            const js = falta && (TABLAS.ventas.find(x => x[1] === falta[1]) || [])[0];
+            if (js && COL_OPC.includes(js) && !FALTAN.has(js)) { FALTAN.add(js); toast('Falta ejecutar v46-mes-facturacion.sql en Supabase para guardar todos los datos de cada servicio.'); TSUBIDA = null; subirTablas(); return; }
             throw new Error('HTTP ' + res.status);
           }
         }
@@ -1203,16 +1204,17 @@ const filaLinea = l => `<div class="lin">
 </div>`;
 function dlgVenta(id, mesPre) {
   const nuevo = id === 'nuevo';
-  const v = nuevo ? { mes: mesPre || ymHoy(), area: 'rental', cliente: '', oc: '', edp: '', equipos: '', desde: '', hasta: '', neto: '', proveedor: '', estado: 'pendiente', factura: '', fechaFactura: '', fechaPago: '', hes: '', notas: '' } : ventas().find(x => x.id === id);
+  const v = nuevo ? { mes: mesPre || ymHoy(), area: 'rental', cliente: '', oc: '', edp: '', equipos: '', desde: '', hasta: '', neto: '', proveedor: '', estado: 'pendiente', factura: '', fechaFactura: '', fechaPago: '', hes: '', mesFacturacion: '', notas: '' } : ventas().find(x => x.id === id);
   if (!v) return;
-  const t = (n, txt, tipo = 'text', extra = '') => `<label class="campo" style="margin-bottom:10px">${txt}<input name="${n}" type="${tipo}" value="${esc(v[n] ?? '')}" ${extra}></label>`;
+  const t = (n, txt, tipo = 'text', extra = '') => `<label class="campo" style="margin-bottom:10px">${txt}<input name="${n}" type="${tipo}" value="${esc((n === 'mesFacturacion' ? v.mesFacturacion || (v.fechaFactura || '').slice(0, 7) : v[n]) ?? '')}" ${extra}></label>`;
   const ls = nuevo ? [{ id: 'l1', equipo: '', neto: '', tercero: false, leasing: null }] : lineasDe(v);
   const d = dialogo(`<form onsubmit="guardarVenta(event,'${id}')"><h2>${nuevo ? 'Nuevo servicio' : 'Servicio'}</h2>
     <div class="prev-leas" id="prevVenta" aria-live="polite"></div>
     <label class="campo" style="margin:12px 0 10px">Cliente<input name="cliente" required list="lsClientes2" autocomplete="off" value="${esc(v.cliente)}"></label>
     <datalist id="lsClientes2">${clientes().map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
     <datalist id="lsEquipos2">${S.camiones.map(c => `<option value="${esc(etq(c))}">`).join('')}</datalist>
-    <div class="grid grid-2">${t('oc', 'N° de orden de compra')}${t('mes', 'Mes de servicio', 'month', 'required')}</div>
+    ${t('oc', 'N° de orden de compra')}
+    <div class="grid grid-2">${t('mes', 'Mes de servicio', 'month', 'required')}${t('mesFacturacion', 'Mes de facturación', 'month')}</div>
     <div class="grid grid-2">${t('desde', 'Desde', 'date')}${t('hasta', 'Hasta', 'date')}</div>
     <h3 style="margin:.5rem 0">Equipos <span class="sec" style="font-weight:400;font-size:.9rem">(${ls.length === 1 && !v.lineas && /( y | - |,)/.test(v.equipos || '') ? 'este arriendo trae varios equipos juntos: sepáralos y reparte el monto' : 'monto neto de cada uno'})</span></h3>
     <div id="lineas">${ls.map(filaLinea).join('')}</div>
@@ -1262,11 +1264,12 @@ function guardarVenta(ev, id) {
   if (!ls.length) { toast('Agrega al menos un equipo con su monto neto.'); return; }
   if (d.desde && d.hasta && d.hasta < d.desde) { toast('La fecha "hasta" debe ser posterior a "desde".'); return; }
   const neto = sumar(ls, l => l.neto), leas = sumar(ls, l => l.leasing || 0);
-  const dato = { mes: d.mes, area: 'rental', cliente: d.cliente.trim(), oc: d.oc.trim(), edp: d.edp.trim(), hes: d.hes.trim(), lineas: ls.map((l, i) => ({ ...l, id: 'l' + (i + 1) })), equipos: ls.map(l => l.equipo).filter(Boolean).join(' - '),
+  const dato = { mes: d.mes, area: 'rental', cliente: d.cliente.trim(), oc: d.oc.trim(), edp: d.edp.trim(), hes: d.hes.trim(), mesFacturacion: d.mesFacturacion || '', lineas: ls.map((l, i) => ({ ...l, id: 'l' + (i + 1) })), equipos: ls.map(l => l.equipo).filter(Boolean).join(' - '),
     desde: d.desde, hasta: d.hasta, neto, proveedor: ls.some(l => l.tercero) ? leas : null, estado: d.estado, factura: d.factura.trim(), fechaFactura: d.fechaFactura, fechaPago: d.fechaPago, notas: d.notas.trim() };
   if (dato.fechaPago) dato.estado = 'pagado';
   else if (dato.fechaFactura && (dato.estado === 'pendiente' || dato.estado === 'en revision')) dato.estado = 'facturado';
   if (dato.estado === 'facturado' && !dato.fechaFactura) dato.fechaFactura = isoLocal(Date.now());
+  if (!dato.mesFacturacion && dato.fechaFactura) dato.mesFacturacion = dato.fechaFactura.slice(0, 7); // si solo hay fecha de factura, el mes sale de ahí
   if (!clienteDe(dato)) clientes().push({ id: 'cl' + Date.now(), nombre: dato.cliente, contacto: '', telefono: '', correo: '' });
   if (id === 'nuevo') ventas().push({ id: 'v' + Date.now(), origen: 'app', ...dato }); else Object.assign(ventas().find(x => x.id === id), dato);
   guardar(); cerrarDlg(); toast(`Servicio guardado en ${nombreMes(dato.mes)}`);
@@ -1337,6 +1340,7 @@ function leerLibro(wb, anio) {
           proveedor: C.prov >= 0 && typeof r[C.prov] === 'number' && r[C.prov] > 0 ? Math.round(r[C.prov]) : null,
           estado: e === 'pagado' ? 'pagado' : e === 'facturado' ? 'facturado' : e.startsWith('enrevision') ? 'en revision' : 'pendiente',
           factura: C.factura >= 0 ? textoCelda(r[C.factura]) : '', fechaFactura: C.fechaFac >= 0 ? isoCelda(r[C.fechaFac]) : '', fechaPago: '', notas: obs, origen: 'excel' };
+        v.mesFacturacion = v.fechaFactura ? v.fechaFactura.slice(0, 7) : '';
         // Observaciones tipo "8 de mayo pagan atrasada" traen la fecha de pago
         const m = obs.toLowerCase().match(/(\d{1,2}) de (enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)[^.]*pag/);
         if (m && v.estado === 'facturado') { v.fechaPago = `${anio}-${dos(mesesLower.indexOf(m[2]) + 1)}-${dos(m[1])}`; v.estado = 'pagado'; }

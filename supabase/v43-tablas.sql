@@ -34,6 +34,7 @@ create table if not exists ventas (
   notas text not null default '',
   origen text not null default 'app',  -- app o excel
   hes text not null default '',        -- N° HES
+  mes_facturacion text not null default '',  -- 'AAAA-MM'
   lineas jsonb,                        -- equipos de la orden: [{id, equipo, neto, tercero, leasing}]
   creado timestamptz not null default now()
 );
