@@ -389,6 +389,12 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .docs li{display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--borde)}
 .docs li button.doc{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
 .docs li button.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prev-leas{position:sticky;top:-18px;z-index:2;box-shadow:0 6px 8px -6px rgba(0,0,0,.2);background:#F8FAFC;border:1px solid var(--borde);border-radius:12px;padding:12px;margin-top:4px}
+.prev-leas dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:4px 12px}
+.prev-leas dt{color:var(--texto-2)} .prev-leas dd{margin:0;text-align:right;font-weight:700}
+.prev-leas .grande{font-size:1.4rem}
+.prev-leas dl{font-size:.92rem}
+.dlg.ancho{width:min(94vw,460px);max-height:92vh;overflow-y:auto}
 main h2.grupo-mas,body.con-side main h2.grupo-mas{font-family:inherit;font-weight:700;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--texto-2);margin:16px 2px 8px}
 @media print{.tabbar{display:none !important}}
 @media print{.side,.scrim,.top,.demo-banda,.no-print{display:none !important}body.con-side .contenido{margin-left:0}main{padding:0}.tarjeta{break-inside:avoid}.papel{border:0;box-shadow:none;padding:0}}
@@ -415,6 +421,7 @@ main h2.grupo-mas,body.con-side main h2.grupo-mas{font-family:inherit;font-weigh
 
 <!-- Iconos (estilo Lucide) -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-calc" viewBox="0 0 24 24"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h8"/></symbol>
   <symbol id="i-dollar" viewBox="0 0 24 24"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></symbol>
   <symbol id="i-truck" viewBox="0 0 24 24"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
@@ -557,7 +564,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '38'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '39'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -830,7 +837,7 @@ addEventListener('offline', () => { pintarRed(); render(); });
 const MODULOS = [
   ['', [['inicio', 'home', 'Inicio'], ['avisos', 'bell', 'Avisos']]],
   ['MANTENIMIENTO', [['flota', 'truck', 'Flota'], ['horometros', 'gauge', 'Horómetros'], ['revisiones', 'shield', 'Revisiones técnicas']]],
-  ['ADMINISTRACIÓN Y FINANZAS', [['contratos', 'file', 'Contratos'], ['finanzas', 'dollar', 'Facturas y pagos']]],
+  ['ADMINISTRACIÓN Y FINANZAS', [['contratos', 'file', 'Contratos'], ['finanzas', 'dollar', 'Facturas y pagos'], ['leasing', 'calc', 'Leasing']]],
 ]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
 if (REAL) MODULOS[2][1].push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
 const MENU = MODULOS.flatMap(m => m[1]);
@@ -918,6 +925,7 @@ VISTAS.mas = () => {
   <div class="menu-grilla">
     ${acceso('contratos', 'file', 'Contratos', '#2563EB')}
     ${acceso('finanzas', 'dollar', 'Facturas y pagos', '#2563EB')}
+    ${acceso('leasing', 'calc', 'Leasing', '#2563EB')}
     ${REAL ? acceso('usuarios', 'users', 'Usuarios', '#7C3AED') : ''}
   </div>
   ${REAL ? '<button class="btn" style="width:100%;background:#E4E6EB;border-color:#E4E6EB" onclick="salir()">Cerrar sesión</button>' : ''}`;
@@ -932,6 +940,100 @@ VISTAS.finanzas = () => `
   <a class="tarjeta fila" style="text-decoration:none;color:inherit;justify-content:space-between" href="#contratos">
     <span><b>Contratos</b><span class="sec" style="display:block">${S.contratos.length} ${S.contratos.length === 1 ? 'contrato' : 'contratos'}</span></span>${ic('chevron')}</a>`;
 /* === fin Facturas y pagos === */
+
+/* === Leasing (v39): cuota de cada equipo y cuánto queda del arriendo === */
+const leasings = () => S.leasing || (S.leasing = []);
+const peso = v => (v < 0 ? '-$' : '$') + n0(Math.abs(v));
+const pesoCorto = v => { const a = Math.abs(v), sg = v < 0 ? '-$' : '$'; return a >= 1e6 ? sg + n1(a / 1e6) + ' M' : a >= 1e4 ? sg + n0(a / 1e3) + ' mil' : peso(v); };
+// Cuota fija mensual: tasa anual dividida en 12; el valor final (opción de compra) se paga al terminar. Valores netos, sin IVA.
+function calcLeasing(d) {
+  const valor = +d.valor || 0, pie = +d.pie || 0, n = Math.round(+d.plazo) || 0, vf = +d.vf || 0, arriendo = +d.arriendo || 0;
+  const i = (+d.tasa || 0) / 100 / 12, fin = valor - pie;
+  if (!(fin > 0) || n < 1) return null;
+  const cuota = i === 0 ? (fin - vf) / n : (fin - vf / Math.pow(1 + i, n)) * i / (1 - Math.pow(1 + i, -n));
+  const pagado = cuota * n, intereses = pagado + vf - fin;
+  let pagadas = null, termina = null;
+  if (d.inicio) {
+    const a = new Date(d.inicio + 'T12:00'), h = new Date();
+    let m = (h.getFullYear() - a.getFullYear()) * 12 + h.getMonth() - a.getMonth();
+    if (h.getDate() < a.getDate()) m--;
+    pagadas = Math.min(n, Math.max(0, m)); termina = new Date(a.getFullYear(), a.getMonth() + n, a.getDate());
+  }
+  return { fin, cuota, intereses, vf, n, pagado, total: pie + pagado + vf, queda: arriendo ? arriendo - cuota : null, pct: arriendo ? (arriendo - cuota) / arriendo * 100 : null, pagadas, termina };
+}
+VISTAS.leasing = () => {
+  const ls = leasings().map(l => ({ l, r: calcLeasing(l) })).filter(x => x.r);
+  const cuotas = ls.reduce((t, x) => t + x.r.cuota, 0);
+  const con = ls.filter(x => x.r.queda != null), queda = con.reduce((t, x) => t + x.r.queda, 0);
+  return `
+  <div class="cab"><div><h1>Leasing</h1><p class="sec" style="margin:0">Cuota de cada equipo y cuánto queda del arriendo.</p></div>
+    <button class="btn chico cta no-print" onclick="dlgLeasing('nuevo')">${ic('plus')}Nuevo leasing</button></div>
+  ${ls.length ? `<div class="kpis k3">
+    ${kpi('', ls.length, 'Equipos', 'truck')}
+    ${kpi('', pesoCorto(cuotas), 'Cuotas al mes', 'dollar')}
+    ${kpi(con.length ? (queda < 0 ? 'urgente' : '') : '', con.length ? pesoCorto(queda) : '—', 'Queda al mes', 'check')}
+  </div>
+  <div class="lista" style="--cols:minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr) 24px">
+    <div class="lista-cab"><span>Equipo</span><span>Cuota</span><span>Arriendo</span><span>Queda</span><span></span></div>
+    ${ls.map(({ l, r }) => `<a class="lista-fila" href="#leasing" role="button" onclick="dlgLeasing('${l.id}');return false">
+      <span class="celda-pri"><b>${esc(l.equipo)}</b><span class="sub">${r.pagadas != null ? `Cuota ${r.pagadas} de ${r.n}` : `${r.n} cuotas`}<span class="solo-movil"> · ${peso(r.cuota)} al mes</span></span></span>
+      <span class="opc num">${peso(r.cuota)}</span>
+      <span class="opc num">${l.arriendo ? peso(+l.arriendo) : '—'}</span>
+      <span>${r.queda == null ? '<span class="sec">Sin arriendo</span>' : estado(r.queda < 0 ? 'urgente' : 'ok', (r.queda < 0 ? 'Pierde ' : 'Queda ') + peso(Math.abs(r.queda)))}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
+  </div>
+  <p class="ayuda">Valores netos, sin IVA. La tasa anual se divide en 12 meses.</p>`
+  : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay equipos con leasing.</p><button class="btn cta" onclick="dlgLeasing('nuevo')">${ic('plus')}Agregar el primero</button></div>`}`;
+};
+function dlgLeasing(id) {
+  const nuevo = id === 'nuevo', l = nuevo ? { equipo: '', valor: '', pie: 0, plazo: 48, tasa: '', vf: 0, arriendo: '', inicio: '' } : leasings().find(x => x.id === id);
+  if (!l) return;
+  const campo = (n, t, extra = '') => `<label class="campo" style="margin-bottom:10px">${t}<input name="${n}" type="number" min="0" step="any" inputmode="decimal" value="${l[n] ?? ''}" ${extra} oninput="prevLeasing(this.form)"></label>`;
+  dialogo(`<form class="ancho-f" onsubmit="guardarLeasing(event,'${id}')"><h2>${nuevo ? 'Nuevo leasing' : 'Editar leasing'}</h2>
+    <div class="prev-leas" id="prevLeas" aria-live="polite"></div>
+    <label class="campo" style="margin:12px 0 10px">Equipo<input name="equipo" required value="${esc(l.equipo)}" list="lsEquipos" placeholder="Patente o nombre" autocomplete="off"></label>
+    <datalist id="lsEquipos">${S.camiones.map(c => `<option value="${esc(fmtPatente(c.patente))}">`).join('')}</datalist>
+    ${campo('valor', 'Valor del equipo ($)', 'required')}
+    ${campo('pie', 'Pie ($)')}
+    ${campo('plazo', 'Plazo (meses)', 'required min="1" max="120" step="1"')}
+    ${campo('tasa', 'Tasa anual (%)', 'required')}
+    ${campo('vf', 'Valor final o de compra ($)')}
+    ${campo('arriendo', 'Arriendo mensual del equipo ($)')}
+    <label class="campo" style="margin-bottom:10px">Primera cuota <span class="ayuda">(opcional)</span><input name="inicio" type="date" value="${l.inicio || ''}" onchange="prevLeasing(this.form)"></label>
+    <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
+    ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarLeasing('${id}')">Eliminar leasing</button>`}</form>`)
+    .classList.add('ancho');
+  prevLeasing(document.querySelector('dialog.dlg form'));
+}
+function prevLeasing(f) {
+  const d = Object.fromEntries(new FormData(f)), r = calcLeasing(d), box = $('#prevLeas');
+  if (!box) return;
+  if (!r) { box.innerHTML = '<span class="sec">Escribe el valor, el plazo y la tasa para ver la cuota.</span>'; return; }
+  box.innerHTML = `<dl><dt>Cuota mensual</dt><dd class="grande">${peso(r.cuota)}</dd>
+    <dt>Intereses totales</dt><dd>${peso(r.intereses)}</dd><dt>Costo total del equipo</dt><dd>${peso(r.total)}</dd>
+    ${r.queda != null ? `<dt>Arriendo menos cuota</dt><dd style="color:${r.queda < 0 ? 'var(--ur-t)' : 'var(--ok-t)'}">${r.queda < 0 ? 'Pierde ' : 'Queda '}${peso(Math.abs(r.queda))} (${n1(r.pct)} %)</dd>` : ''}
+    ${r.termina ? `<dt>Última cuota</dt><dd>${fecha(r.termina)}</dd>` : ''}</dl>`;
+}
+function guardarLeasing(ev, id) {
+  ev.preventDefault();
+  const d = Object.fromEntries(new FormData(ev.target));
+  const num = k => d[k] === '' ? 0 : Number(d[k]);
+  const dato = { equipo: d.equipo.trim(), valor: num('valor'), pie: num('pie'), plazo: Math.round(num('plazo')), tasa: num('tasa'), vf: num('vf'), arriendo: num('arriendo'), inicio: d.inicio || '' };
+  if (!(dato.valor > 0)) { toast('El valor del equipo debe ser mayor que cero.'); return; }
+  if (dato.pie >= dato.valor) { toast('El pie debe ser menor que el valor del equipo.'); return; }
+  if (!(dato.plazo >= 1 && dato.plazo <= 120)) { toast('El plazo va entre 1 y 120 meses.'); return; }
+  if (dato.vf >= dato.valor - dato.pie) { toast('El valor final debe ser menor que el monto financiado.'); return; }
+  if (id === 'nuevo') leasings().push({ id: 'ls' + Date.now(), ...dato }); else Object.assign(leasings().find(x => x.id === id), dato);
+  guardar(); cerrarDlg(); toast('Leasing guardado'); render();
+}
+function quitarLeasing(id) {
+  const l = leasings().find(x => x.id === id); if (!l) return;
+  window._borrarLeasing = () => { S.leasing = leasings().filter(x => x.id !== id); guardar(); cerrarDlg(); toast('Leasing eliminado'); render(); };
+  cerrarDlg();
+  dialogo(`<h2>¿Eliminar el leasing de ${esc(l.equipo)}?</h2><p style="margin:0">Se borran sus datos. <b>No se puede deshacer.</b></p>
+    <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="_borrarLeasing()">Sí, eliminar</button></div>`);
+}
+/* === fin Leasing === */
 function render() {
   let { r, arg, q } = leerRuta();
   if (!r) r = HOME[S.rol];
