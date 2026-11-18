@@ -559,7 +559,7 @@ completarDatos();
 S.usuarios.forEach(u => { if (u.id === 'u0' && u.nombre === 'Felipe') u.nombre = 'Administración'; }); // datos guardados de versiones anteriores
 function guardar() {
   try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento: la demo funciona igual en memoria */ }
-  if (NUBE) subirEstado(); // con sesión iniciada, los cambios se comparten con todos los equipos
+  if (NUBE) { subirEstado(); subirTablas(); } // con sesión iniciada, los cambios se comparten con todos los equipos
 }
 var NUBE = false; // true cuando hay sesión y la app ya trajo el estado desde Supabase
 
@@ -569,7 +569,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '42'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '43'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -605,6 +605,7 @@ function subirEstado() {
     if (!(await sesionVigente())) return sesionPerdida();
     S._v = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const { chat, ...datos } = S;
+    if (TABLAS_OK) { delete datos.clientes; delete datos.ventas; delete datos.leasing; } // viven en sus propias tablas
     try {
       const res = await fetch(`${SUPA_URL}/rest/v1/estado_app`, { method: 'POST',
         headers: { ...supaHeaders(), 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -626,10 +627,81 @@ async function bajarEstado() { // devuelve true si llegaron cambios hechos en ot
   if (!fila) { subirEstado(); return false; } // primera vez: se sube lo que hay en este equipo
   if (fila.datos._v === VERSION_NUBE) return false;
   VERSION_NUBE = fila.datos._v;
-  S = { ...fila.datos, rol: 'dueno', chat: S.chat, estados: fila.datos.estados || {} };
+  S = { ...fila.datos, rol: 'dueno', chat: S.chat, estados: fila.datos.estados || {}, ...(TABLAS_OK ? { clientes: S.clientes, ventas: S.ventas, leasing: S.leasing } : {}) };
   completarDatos();
   try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ }
   return true;
+}
+
+/* Tablas propias (v43): clientes, ventas y leasing viven en tablas de Supabase, una fila cada uno (supabase/v43-tablas.sql).
+   La app trabaja con las mismas listas de siempre (S.clientes, S.ventas, S.leasing); al guardar, solo se suben las filas que cambiaron.
+   Si las tablas todavía no existen, todo sigue guardándose en el registro compartido como antes. */
+const TABLAS = {
+  clientes: [['id', 'id'], ['nombre', 'nombre'], ['contacto', 'contacto'], ['telefono', 'telefono'], ['correo', 'correo'], ['plazoPago', 'plazo_pago', 'n']],
+  ventas: [['id', 'id'], ['mes', 'mes'], ['area', 'area'], ['cliente', 'cliente'], ['oc', 'oc'], ['edp', 'edp'], ['equipos', 'equipos'], ['desde', 'desde', 'f'], ['hasta', 'hasta', 'f'], ['neto', 'neto', 'n'],
+    ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen']],
+  leasing: [['id', 'id'], ['equipo', 'equipo'], ['valor', 'valor', 'n'], ['pie', 'pie', 'n'], ['plazo', 'plazo', 'n'], ['tasa', 'tasa', 'n'], ['vf', 'vf', 'n'], ['arriendo', 'arriendo', 'n'], ['inicio', 'inicio', 'f']],
+};
+let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null;
+const valorFila = (v, tipo) => tipo === 'f' ? (v || null) : tipo === 'n' ? (v === '' || v == null || isNaN(Number(v)) ? null : Number(v)) : (v ?? '');
+const aFila = (t, o) => Object.fromEntries(TABLAS[t].map(([js, db, tipo]) => [db, valorFila(o[js], tipo)]));
+const deFila = (t, r) => Object.fromEntries(TABLAS[t].map(([js, db, tipo]) => [js, tipo === 'f' ? (r[db] || '') : tipo === 'n' ? (r[db] == null ? null : Number(r[db])) : (r[db] ?? '')]));
+async function leerTabla(t) { // null si la tabla no existe todavía
+  const filas = [];
+  for (let off = 0; ; off += 1000) {
+    const res = await fetch(`${SUPA_URL}/rest/v1/${t}?select=*&order=id.asc&limit=1000&offset=${off}`, { headers: supaHeaders() });
+    if (res.status === 401) throw Object.assign(new Error('sesión'), { sesion: true });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const lote = await res.json(); filas.push(...lote);
+    if (lote.length < 1000) return filas;
+  }
+}
+async function bajarTablas() { // devuelve true si llegaron cambios hechos en otro equipo
+  if (TSUBIDA) return false; // hay cambios propios por subir: no se pisan
+  const nuevo = {};
+  for (const t of Object.keys(TABLAS)) {
+    const filas = await leerTabla(t);
+    if (filas === null) { TABLAS_OK = false; return false; } // sin tablas: modo anterior
+    nuevo[t] = filas.map(r => deFila(t, r));
+  }
+  TABLAS_OK = true;
+  let cambio = false;
+  for (const t of Object.keys(TABLAS)) {
+    const firma = JSON.stringify(nuevo[t]);
+    if (firma === SNAP_NUBE[t]) continue;
+    SNAP_NUBE[t] = firma; S[t] = nuevo[t]; cambio = true;
+    SNAP[t] = Object.fromEntries(S[t].map(o => [o.id, JSON.stringify(aFila(t, o))]));
+  }
+  if (cambio) try { localStorage.setItem(CLAVE, JSON.stringify(S)); } catch (e) { /* sin almacenamiento */ }
+  return cambio;
+}
+function subirTablas() {
+  if (!TABLAS_OK) return;
+  clearTimeout(TSUBIDA);
+  TSUBIDA = setTimeout(async () => {
+    try {
+      if (!(await sesionVigente())) { TSUBIDA = null; return sesionPerdida(); }
+      const H = { ...supaHeaders(), 'Content-Type': 'application/json' };
+      for (const t of Object.keys(TABLAS)) {
+        const ahora = {}; (S[t] || []).forEach(o => { ahora[o.id] = JSON.stringify(aFila(t, o)); });
+        const previo = SNAP[t] || {};
+        const subir = Object.keys(ahora).filter(id => ahora[id] !== previo[id]), borrar = Object.keys(previo).filter(id => !(id in ahora));
+        for (let i = 0; i < subir.length; i += 200) {
+          const lote = subir.slice(i, i + 200).map(id => JSON.parse(ahora[id]));
+          const res = await fetch(`${SUPA_URL}/rest/v1/${t}`, { method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(lote) });
+          if (res.status === 401) { TSUBIDA = null; return sesionPerdida(); }
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+        }
+        if (borrar.length) {
+          const res = await fetch(`${SUPA_URL}/rest/v1/${t}?id=in.(${borrar.map(id => '"' + id + '"').join(',')})`, { method: 'DELETE', headers: H });
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+        }
+        SNAP[t] = ahora; SNAP_NUBE[t] = JSON.stringify(S[t]); // lo subido pasa a ser "lo último de la nube"
+      }
+    } catch (e) { toast('No se pudo guardar en línea. Revisa la conexión.'); }
+    TSUBIDA = null;
+  }, 500);
 }
 
 let FIRMA = '', ULTIMO_ID = null;
@@ -637,7 +709,7 @@ async function traerLecturas() {
   if (!SESION) return; // sin sesión no se consulta nada (la pantalla de entrada ya está a la vista)
   if (!(await sesionVigente())) return sesionPerdida();
   try {
-    const cambioEstado = await bajarEstado();
+    const ce1 = await bajarEstado(), ce2 = await bajarTablas(), cambioEstado = ce1 || ce2;
     const res = await fetch(`${SUPA_URL}/rest/v1/lecturas?select=id,patente,valor,fecha,origen,nombre&order=fecha.asc`, { headers: supaHeaders() });
     if (res.status === 401) throw Object.assign(new Error('sesión'), { sesion: true });
     if (!res.ok) throw new Error('HTTP ' + res.status);

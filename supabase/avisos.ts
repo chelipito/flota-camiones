@@ -81,13 +81,13 @@ function revisar(cam: any, ls: { valor: number; fecha: number }[], ficha: any, c
 // "🟡 Por vencer · Mantención\nHKTZ48: faltan…" → "🟡 HKTZ48: faltan…" (para el resumen)
 const lineaCorta = (texto: string) => `${texto.split(' ')[0]} ${texto.split('\n')[1] ?? ''}`;
 // Facturas emitidas y no pagadas: vencen a los N días de la fecha de factura (plazo del cliente, o el normal de Configuración)
-function avisosFacturas(datos: any, cfg: any) {
+function avisosFacturas(ventas: any[], clientes: any[], cfg: any) {
   const ETQ: Record<string, string> = { porvencer: '🟡 Por vencer', urgente: '🔴 Urgente', vencido: '🔴 Atrasada' };
   const norm = (t: unknown) => String(t ?? '').trim().toLowerCase();
   const out: { clave: string; texto: string }[] = [];
-  for (const v of datos.ventas ?? []) {
+  for (const v of ventas) {
     if (v.estado !== 'facturado' || !v.fechaFactura) continue;
-    const cl = (datos.clientes ?? []).find((c: any) => norm(c.nombre) === norm(v.cliente));
+    const cl = clientes.find((c: any) => norm(c.nombre) === norm(v.cliente));
     const plazo = Number(cl?.plazoPago) || Number(cfg.plazoPagoDias ?? 30);
     const d = diasHasta(new Date(utc(v.fechaFactura) + plazo * DIA).toISOString().slice(0, 10));
     const e = d < 0 ? 'vencido' : d <= (cfg.diasFacturaUrgente ?? 2) ? 'urgente' : d <= (cfg.diasFacturaAviso ?? 7) ? 'porvencer' : 'ok';
@@ -155,7 +155,12 @@ Deno.serve(async (req) => {
 
   // Facturas por cobrar: en la revisión de todo (tarea diaria o "Revisar ahora"), no al registrar el horómetro de un camión
   if (!patente) {
-    const fa = avisosFacturas(datos, cfg);
+    // Las facturas viven en las tablas ventas y clientes (supabase/v43-tablas.sql); si aún no existen, se usa el registro compartido
+    const { data: vt, error: errV } = await db.from('ventas').select('id, cliente, neto, estado, factura, fecha_factura').eq('estado', 'facturado');
+    const { data: ct } = await db.from('clientes').select('nombre, plazo_pago');
+    const vs = errV ? (datos.ventas ?? []) : (vt ?? []).map((v: any) => ({ id: v.id, cliente: v.cliente, neto: v.neto, estado: v.estado, factura: v.factura, fechaFactura: v.fecha_factura }));
+    const cls = errV ? (datos.clientes ?? []) : (ct ?? []).map((c: any) => ({ nombre: c.nombre, plazoPago: c.plazo_pago }));
+    const fa = avisosFacturas(vs, cls, cfg);
     pendientes.push(...fa.map((x) => lineaCorta(x.texto)));
     if (destinos.length && cfg.avisoInmediato !== false) {
       for (const x of fa) {
