@@ -576,7 +576,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '58'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '59'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -648,11 +648,11 @@ const TABLAS = {
   ventas: [['id', 'id'], ['mes', 'mes'], ['area', 'area'], ['cliente', 'cliente'], ['oc', 'oc'], ['edp', 'edp'], ['equipos', 'equipos'], ['desde', 'desde', 'f'], ['hasta', 'hasta', 'f'], ['neto', 'neto', 'n'],
     ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen'], ['hes', 'hes'], ['mesFacturacion', 'mes_facturacion'], ['lineas', 'lineas', 'j']],
   proveedores: [['id', 'id'], ['nombre', 'nombre'], ['rut', 'rut'], ['direccion', 'direccion'], ['encargado', 'encargado'], ['rutEncargado', 'rut_encargado'], ['correo', 'correo']],
-  compras: [['id', 'id'], ['proveedor', 'proveedor'], ['factura', 'factura'], ['fecha', 'fecha', 'f'], ['vence', 'vence', 'f'], ['neto', 'neto', 'n'], ['estado', 'estado'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['mesServicio', 'mes_servicio'], ['abonado', 'abonado', 'n']],
+  compras: [['id', 'id'], ['proveedor', 'proveedor'], ['factura', 'factura'], ['fecha', 'fecha', 'f'], ['vence', 'vence', 'f'], ['neto', 'neto', 'n'], ['estado', 'estado'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['mesServicio', 'mes_servicio'], ['abonado', 'abonado', 'n'], ['pagos', 'pagos', 'j']],
   leasing: [['id', 'id'], ['equipo', 'equipo'], ['valor', 'valor', 'n'], ['pie', 'pie', 'n'], ['plazo', 'plazo', 'n'], ['tasa', 'tasa', 'n'], ['vf', 'vf', 'n'], ['arriendo', 'arriendo', 'n'], ['inicio', 'inicio', 'f']],
 };
 let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null, FALTAN = new Set(); // FALTAN: columnas opcionales de ventas que la base aún no tiene (lineas, hes y mes de facturación; supabase/v46-mes-facturacion.sql)
-const COL_OPC = { ventas: ['lineas', 'hes', 'mesFacturacion'], compras: ['mesServicio', 'abonado'] };
+const COL_OPC = { ventas: ['lineas', 'hes', 'mesFacturacion'], compras: ['mesServicio', 'abonado', 'pagos'] };
 const TABLAS_OPC = ['compras', 'proveedores'], TABLAS_SIN = new Set(); // tablas nuevas que pueden no existir aún (v47-compras.sql): si faltan, esa lista sigue en el registro compartido
 const tablasActivas = () => Object.keys(TABLAS).filter(t => !TABLAS_SIN.has(t));
 const valorFila = (v, tipo) => tipo === 'j' ? (v ?? null) : tipo === 'f' ? (v || null) : tipo === 'n' ? (v === '' || v == null || isNaN(Number(v)) ? null : Number(v)) : (v ?? '');
@@ -1155,7 +1155,7 @@ function vistaCaja(anio, q) {
 const compras = () => S.compras || (S.compras = []);
 const cNeto = c => Number(c.neto) || 0, cTotal = c => Math.round(cNeto(c) * 1.19);
 // Estado de pago: 'pendiente' (por pagar), 'parcial' (con abono) o 'pagada'. El abono se anota con IVA.
-const cPagado = c => c.estado === 'pagada' ? cTotal(c) : c.estado === 'parcial' ? Math.min(Number(c.abonado) || 0, cTotal(c)) : 0;
+const cPagado = c => c.estado === 'pagada' ? cTotal(c) : c.estado === 'parcial' ? Math.min(c.pagos && c.pagos.length ? sumar(c.pagos.filter(x => x.pagado), x => Number(x.monto) || 0) : Number(c.abonado) || 0, cTotal(c)) : 0;
 const cDebe = c => cTotal(c) - cPagado(c);
 const mesFactura = c => (c.fecha || '').slice(0, 7) || c.mesServicio || ymHoy();
 const mesServicioC = c => c.mesServicio || mesFactura(c);
@@ -1172,7 +1172,7 @@ function pagoProv(c) {
   else if (d <= (cfg.diasFacturaAviso ?? 7)) e = 'porvencer';
   return { e, d, txt, vence: f };
 }
-const chipCompra = c => c.estado === 'pagada' ? estado('ok', 'Pagado') : c.estado === 'parcial' ? estado('porvencer', 'Pago parcial') : estado('sinreporte', 'Por pagar');
+const chipCompra = c => c.estado === 'pagada' ? estado('ok', 'Pagado') : c.estado === 'parcial' && cPagado(c) > 0 ? estado('porvencer', 'Pago parcial') : estado('sinreporte', 'Por pagar');
 function vistaProveedores(mes) {
   const lista = [...new Set([...compras().map(mesFactura), mes])].sort();
   const cs = compras().filter(c => mesFactura(c) === mes).sort((a, b) => a.proveedor.localeCompare(b.proveedor, 'es') || (a.factura || '').localeCompare(b.factura || ''));
@@ -1192,7 +1192,7 @@ function vistaProveedores(mes) {
       <span class="opc"><b>${esc(nombreMes(mesFactura(c)))}</b></span>
       <span class="opc">${esc(nombreMes(mesServicioC(c)))}</span>
       <span class="opc num"><b>${peso(cTotal(c))}</b></span>
-      <span class="num-estado"><b class="num solo-movil-bloque">${pesoCorto(cTotal(c))}</b>${chipCompra(c)}${c.estado === 'parcial' ? `<span class="sub opc-sub">falta ${peso(cDebe(c))}</span>` : c.estado !== 'pagada' && pagoProv(c).e === 'vencido' ? `<span class="sub opc-sub" style="color:var(--ur-t)">${pagoProv(c).txt}</span>` : ''}</span>
+      <span class="num-estado"><b class="num solo-movil-bloque">${pesoCorto(cTotal(c))}</b>${chipCompra(c)}${c.estado === 'parcial' ? `<span class="sub opc-sub">${c.pagos && c.pagos.length ? c.pagos.filter(x => x.pagado).length + ' de ' + c.pagos.length + ' pagos · ' : ''}falta ${peso(cDebe(c))}</span>` : c.estado !== 'pagada' && pagoProv(c).e === 'vencido' ? `<span class="sub opc-sub" style="color:var(--ur-t)">${pagoProv(c).txt}</span>` : ''}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
     <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc"></span><span class="opc num">${peso(total)}</span><span class="solo-movil-bloque num">${pesoCorto(total)}</span><span class="opc"></span></div>
   </div>
@@ -1212,33 +1212,83 @@ function dlgCompra(id, mesPre) {
       <label class="campo" style="margin-bottom:10px">Fecha de factura<input name="fecha" type="date" required value="${c.fecha || ''}"></label>
       <label class="campo" style="margin-bottom:10px">Mes de servicio<input name="mesServicio" type="month" required value="${mesServicioC(c)}"></label>
     </div>
-    <label class="campo" style="margin-bottom:10px">Monto neto ($)<input name="neto" type="number" min="0" step="any" inputmode="decimal" required value="${c.neto ?? ''}" oninput="prevCompra(this.form)"></label>
+    <label class="campo" style="margin-bottom:10px">Monto neto ($)<input name="neto" type="number" min="0" step="any" inputmode="decimal" required value="${c.neto ?? ''}" oninput="cambiarNPagos(this.form)"></label>
     <label class="campo" style="margin-bottom:10px">Estado de la factura<select name="estado" onchange="prevCompra(this.form)"><option value="pendiente" ${c.estado === 'pendiente' || !c.estado ? 'selected' : ''}>Por pagar</option><option value="parcial" ${c.estado === 'parcial' ? 'selected' : ''}>Pago parcial</option><option value="pagada" ${c.estado === 'pagada' ? 'selected' : ''}>Pagado</option></select></label>
-    <label class="campo" id="cAbono" style="margin-bottom:10px">Monto ya pagado, con IVA ($)<input name="abonado" type="number" min="0" step="any" inputmode="decimal" value="${c.abonado ?? ''}" oninput="prevCompra(this.form)"></label>
+    <div id="cPagos" style="display:none">
+      <label class="campo" style="margin-bottom:10px">Número de pagos<select name="nPagos" onchange="cambiarNPagos(this.form)">${Array.from({ length: 11 }, (_, i) => `<option value="${i + 2}">${i + 2} pagos</option>`).join('')}</select></label>
+      <div id="cFilas"></div>
+      <p class="ayuda" id="cSaldo" aria-live="polite" style="margin:0 0 10px"></p>
+    </div>
     <div class="grid grid-2">
       <label class="campo" style="margin-bottom:10px">Vence <span class="ayuda">(opcional)</span><input name="vence" type="date" value="${c.vence || ''}"></label>
-      <label class="campo" style="margin-bottom:10px">Fecha de pago<input name="fechaPago" type="date" value="${c.fechaPago || ''}"></label>
+      <label class="campo" id="cFPago" style="margin-bottom:10px">Fecha de pago<input name="fechaPago" type="date" value="${c.fechaPago || ''}"></label>
     </div>
     <label class="campo" style="margin-bottom:10px">Observaciones<textarea name="notas" rows="2">${esc(c.notas || '')}</textarea></label>
     <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
     ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarCompra('${id}')">Eliminar factura</button>`}</form>`)
     .classList.add('ancho');
-  prevCompra(document.querySelector('dialog.dlg form'));
+  const fm = document.querySelector('dialog.dlg form');
+  if (c.estado === 'parcial') { // al editar: se muestran los pagos ya guardados (o, si venía con un solo abono, se arma de ahí)
+    const ps = c.pagos && c.pagos.length ? c.pagos : [{ fecha: c.fechaPago || '', monto: Number(c.abonado) || 0, pagado: true }];
+    pintarPagos(fm, filasPagos(fm, Math.max(2, ps.length), ps));
+  }
+  prevCompra(fm);
+}
+// Pagos en cuotas: cada fila trae fecha, monto (con IVA) y si ya se pagó. Los pagados quedan fijos; el resto se reparte en partes iguales.
+function leerPagos(f) {
+  return [...document.querySelectorAll('#cFilas > div')].map((_, i) => ({ fecha: f['pf' + i].value, monto: Math.round(Number(f['pm' + i].value) || 0), pagado: f['pe' + i].value === '1' }));
+}
+function filasPagos(f, n, previos) {
+  const tot = Math.round((Number(f.neto.value) || 0) * 1.19), base = f.fecha.value || isoLocal(Date.now());
+  const pag = previos.filter(x => x.pagado), pen = previos.filter(x => !x.pagado);
+  n = Math.min(12, Math.max(n, pag.length, 2));
+  const libres = n - pag.length, resto = Math.max(0, tot - sumar(pag, x => Number(x.monto) || 0)), cuota = libres ? Math.floor(resto / libres) : 0;
+  const nuevas = Array.from({ length: libres }, (_, i) => ({ fecha: (pen[i] && pen[i].fecha) || sumaDias(base, 30 * (pag.length + i + 1)), monto: i === libres - 1 ? resto - cuota * (libres - 1) : cuota, pagado: false }));
+  return [...pag, ...nuevas];
+}
+function pintarPagos(f, filas) {
+  f.nPagos.value = filas.length;
+  $('#cFilas').innerHTML = filas.map((x, i) => `<div class="tarjeta" style="padding:10px 12px;margin-bottom:8px">
+    <b>Pago ${i + 1}</b> <span class="ayuda" id="pa${i}" style="color:var(--ur-t)"></span>
+    <div class="grid grid-2">
+      <label class="campo" style="margin:6px 0 0">Fecha de pago<input name="pf${i}" type="date" value="${x.fecha || ''}" onchange="prevCompra(this.form)"></label>
+      <label class="campo" style="margin:6px 0 0">Monto con IVA ($)<input name="pm${i}" type="number" min="0" step="any" inputmode="decimal" value="${x.monto}" oninput="prevCompra(this.form)"></label>
+    </div>
+    <label class="campo" style="margin:6px 0 0">Estado de pago<select name="pe${i}" onchange="prevCompra(this.form)"><option value="0" ${x.pagado ? '' : 'selected'}>Pendiente</option><option value="1" ${x.pagado ? 'selected' : ''}>Pagado</option></select></label></div>`).join('');
+}
+function cambiarNPagos(f) { // cambió el número de pagos o el monto neto: se rearma el reparto
+  if (f.estado.value === 'parcial') pintarPagos(f, filasPagos(f, Number(f.nPagos.value), leerPagos(f)));
+  prevCompra(f);
 }
 function prevCompra(f) {
-  const n = Number(f.neto.value) || 0, box = $('#prevCompra'), tot = Math.round(n * 1.19), parcial = f.estado.value === 'parcial', ab = Number(f.abonado.value) || 0;
-  $('#cAbono').style.display = parcial ? '' : 'none';
-  if (box) box.innerHTML = n ? `Neto ${peso(n)} · IVA ${peso(Math.round(n * .19))} · <b>Total ${peso(tot)}</b>${parcial && ab ? ` · falta ${peso(Math.max(0, tot - ab))}` : ''}` : 'Escribe el monto neto para ver el IVA y el total.';
+  const n = Number(f.neto.value) || 0, box = $('#prevCompra'), tot = Math.round(n * 1.19), parcial = f.estado.value === 'parcial';
+  $('#cPagos').style.display = parcial ? '' : 'none';
+  $('#cFPago').style.display = f.estado.value === 'pagada' ? '' : 'none';
+  let falta = '';
+  if (parcial) {
+    if (!$('#cFilas').children.length) pintarPagos(f, filasPagos(f, Number(f.nPagos.value) || 2, []));
+    const ps = leerPagos(f), pag = sumar(ps.filter(x => x.pagado), x => x.monto), suma = sumar(ps, x => x.monto), hoy = isoLocal(Date.now());
+    ps.forEach((x, k) => { const a = $('#pa' + k); if (a) a.textContent = !x.pagado && x.fecha && x.fecha < hoy ? '· Atrasado' : ''; });
+    $('#cSaldo').innerHTML = `Pagado ${peso(pag)} · <b>Saldo por pagar ${peso(Math.max(0, tot - pag))}</b>${Math.abs(suma - tot) > 1 ? `<br><span style="color:var(--ur-t)">Los pagos suman ${peso(suma)} y deben sumar el total, ${peso(tot)}.</span>` : ''}`;
+    falta = ` · falta ${peso(Math.max(0, tot - pag))}`;
+  }
+  if (box) box.innerHTML = n ? `Neto ${peso(n)} · IVA ${peso(Math.round(n * .19))} · <b>Total ${peso(tot)}</b>${falta}` : 'Escribe el monto neto para ver el IVA y el total.';
 }
 function guardarCompra(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target)), hoy = isoLocal(Date.now());
-  const dato = { proveedor: d.proveedor.trim(), factura: d.factura.trim(), fecha: d.fecha, mesServicio: d.mesServicio, vence: d.vence || '', neto: Number(d.neto) || 0, estado: d.estado, abonado: d.estado === 'parcial' ? Number(d.abonado) || 0 : null, fechaPago: d.fechaPago || '', notas: d.notas.trim() };
+  const dato = { proveedor: d.proveedor.trim(), factura: d.factura.trim(), fecha: d.fecha, mesServicio: d.mesServicio, vence: d.vence || '', neto: Number(d.neto) || 0, estado: d.estado, abonado: null, pagos: null, fechaPago: d.fechaPago || '', notas: d.notas.trim() };
   if (!dato.proveedor) { toast('Falta el proveedor.'); return; }
   if (!(dato.neto > 0)) { toast('El monto neto debe ser mayor que cero.'); return; }
   if (!proveedorDe(dato.proveedor)) maestroProv().push({ id: 'pv' + Date.now(), nombre: dato.proveedor, rut: '', direccion: '', encargado: '', rutEncargado: '', correo: '' });
   const tot = Math.round(dato.neto * 1.19);
-  if (dato.estado === 'parcial' && !(dato.abonado > 0 && dato.abonado < tot)) { toast('El pago parcial debe ser mayor que cero y menor que el total (' + peso(tot) + ').'); return; }
+  if (dato.estado === 'parcial') {
+    const ps = leerPagos(ev.target).map((x, k) => ({ id: 'p' + (k + 1), ...x, fecha: x.fecha || (x.pagado ? hoy : '') }));
+    if (Math.abs(sumar(ps, x => x.monto) - tot) > 1) { toast('Los pagos deben sumar el total de la factura (' + peso(tot) + ').'); return; }
+    if (ps.some(x => !(x.monto > 0))) { toast('Cada pago debe tener un monto mayor que cero.'); return; }
+    dato.pagos = ps; dato.abonado = sumar(ps.filter(x => x.pagado), x => x.monto); dato.fechaPago = '';
+    if (ps.every(x => x.pagado)) { dato.estado = 'pagada'; dato.fechaPago = ps.map(x => x.fecha).sort().pop(); } // todos pagados: la factura queda pagada
+  }
   if (dato.estado === 'pagada' && !dato.fechaPago) dato.fechaPago = hoy;
   if (dato.estado === 'pendiente') dato.fechaPago = '';
   if (id === 'nuevo') compras().push({ id: 'cp' + Date.now(), ...dato }); else Object.assign(compras().find(x => x.id === id), dato);
