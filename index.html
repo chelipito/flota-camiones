@@ -389,6 +389,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .docs li{display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--borde)}
 .docs li button.doc{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
 .docs li button.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lin{border:1px solid var(--borde);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
 .din{font-size:.8em;white-space:nowrap;display:inline-block}
 .prev-leas{position:sticky;top:-18px;z-index:2;box-shadow:0 6px 8px -6px rgba(0,0,0,.2);background:#F8FAFC;border:1px solid var(--borde);border-radius:12px;padding:12px;margin-top:4px}
 .prev-leas dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:4px 12px}
@@ -569,7 +570,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '43'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '44'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -639,13 +640,13 @@ async function bajarEstado() { // devuelve true si llegaron cambios hechos en ot
 const TABLAS = {
   clientes: [['id', 'id'], ['nombre', 'nombre'], ['contacto', 'contacto'], ['telefono', 'telefono'], ['correo', 'correo'], ['plazoPago', 'plazo_pago', 'n']],
   ventas: [['id', 'id'], ['mes', 'mes'], ['area', 'area'], ['cliente', 'cliente'], ['oc', 'oc'], ['edp', 'edp'], ['equipos', 'equipos'], ['desde', 'desde', 'f'], ['hasta', 'hasta', 'f'], ['neto', 'neto', 'n'],
-    ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen']],
+    ['proveedor', 'proveedor', 'n'], ['estado', 'estado'], ['factura', 'factura'], ['fechaFactura', 'fecha_factura', 'f'], ['fechaPago', 'fecha_pago', 'f'], ['notas', 'notas'], ['origen', 'origen'], ['lineas', 'lineas', 'j']],
   leasing: [['id', 'id'], ['equipo', 'equipo'], ['valor', 'valor', 'n'], ['pie', 'pie', 'n'], ['plazo', 'plazo', 'n'], ['tasa', 'tasa', 'n'], ['vf', 'vf', 'n'], ['arriendo', 'arriendo', 'n'], ['inicio', 'inicio', 'f']],
 };
-let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null;
-const valorFila = (v, tipo) => tipo === 'f' ? (v || null) : tipo === 'n' ? (v === '' || v == null || isNaN(Number(v)) ? null : Number(v)) : (v ?? '');
-const aFila = (t, o) => Object.fromEntries(TABLAS[t].map(([js, db, tipo]) => [db, valorFila(o[js], tipo)]));
-const deFila = (t, r) => Object.fromEntries(TABLAS[t].map(([js, db, tipo]) => [js, tipo === 'f' ? (r[db] || '') : tipo === 'n' ? (r[db] == null ? null : Number(r[db])) : (r[db] ?? '')]));
+let TABLAS_OK = false, SNAP = {}, SNAP_NUBE = {}, TSUBIDA = null, LINEAS_OK = true; // LINEAS_OK: la tabla ventas ya tiene la columna lineas (supabase/v44-lineas.sql)
+const valorFila = (v, tipo) => tipo === 'j' ? (v ?? null) : tipo === 'f' ? (v || null) : tipo === 'n' ? (v === '' || v == null || isNaN(Number(v)) ? null : Number(v)) : (v ?? '');
+const aFila = (t, o) => Object.fromEntries(TABLAS[t].filter(([js]) => LINEAS_OK || js !== 'lineas').map(([js, db, tipo]) => [db, valorFila(o[js], tipo)]));
+const deFila = (t, r) => Object.fromEntries(TABLAS[t].map(([js, db, tipo]) => [js, tipo === 'j' ? (r[db] ?? null) : tipo === 'f' ? (r[db] || '') : tipo === 'n' ? (r[db] == null ? null : Number(r[db])) : (r[db] ?? '')]));
 async function leerTabla(t) { // null si la tabla no existe todavía
   const filas = [];
   for (let off = 0; ; off += 1000) {
@@ -664,6 +665,7 @@ async function bajarTablas() { // devuelve true si llegaron cambios hechos en ot
     const filas = await leerTabla(t);
     if (filas === null) { TABLAS_OK = false; return false; } // sin tablas: modo anterior
     nuevo[t] = filas.map(r => deFila(t, r));
+    if (t === 'ventas' && filas.length) LINEAS_OK = 'lineas' in filas[0];
   }
   TABLAS_OK = true;
   let cambio = false;
@@ -691,7 +693,10 @@ function subirTablas() {
           const lote = subir.slice(i, i + 200).map(id => JSON.parse(ahora[id]));
           const res = await fetch(`${SUPA_URL}/rest/v1/${t}`, { method: 'POST', headers: { ...H, Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(lote) });
           if (res.status === 401) { TSUBIDA = null; return sesionPerdida(); }
-          if (!res.ok) throw new Error('HTTP ' + res.status);
+          if (!res.ok) {
+            if (t === 'ventas' && LINEAS_OK && /lineas/i.test(await res.text())) { LINEAS_OK = false; toast('Falta ejecutar v44-lineas.sql en Supabase para guardar los equipos de cada orden.'); TSUBIDA = null; subirTablas(); return; }
+            throw new Error('HTTP ' + res.status);
+          }
         }
         if (borrar.length) {
           const res = await fetch(`${SUPA_URL}/rest/v1/${t}?id=in.(${borrar.map(id => '"' + id + '"').join(',')})`, { method: 'DELETE', headers: H });
@@ -1020,7 +1025,7 @@ const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', '
 const nombreMes = ym => MESES[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
 const ymHoy = () => isoLocal(Date.now()).slice(0, 7);
 const sumar = (xs, f) => xs.reduce((t, x) => t + f(x), 0);
-// Montos: se guarda el neto; IVA 19 % y total se calculan. Margen = neto - valor del proveedor (equipos de terceros).
+// Montos: se guarda el neto; IVA 19 % y total se calculan. Ganancia (margen) = neto - leasing de los equipos de terceros (valor proveedor).
 const vNeto = v => Number(v.neto) || 0, vCosto = v => Number(v.proveedor) || 0;
 const vTotal = v => Math.round(vNeto(v) * 1.19), vMargen = v => vNeto(v) - vCosto(v);
 const clienteDe = v => clientes().find(c => normNombre(c.nombre) === normNombre(v.cliente));
@@ -1062,10 +1067,10 @@ VISTAS.finanzas = (_, q) => {
   const cuerpo = tab === 'caja' ? vistaCaja(anio) : tab === 'cobrar' ? vistaCobrar() : tab === 'mes' ? vistaMes(mes, ms) : vistaResumen(anio);
   return `
   <div class="cab"><div><h1>Ventas y caja</h1><p class="sec" style="margin:0">Cuánto se vende, cuánto se cobra y cuánto queda.</p></div>
-    <button class="btn chico cta no-print" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Nuevo arriendo</button></div>
+    <button class="btn chico cta no-print" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Nueva orden de compra</button></div>
   <nav class="filtros no-print" aria-label="Secciones">${pest('caja', 'Caja')}${pest('cobrar', 'Por cobrar')}${pest('mes', 'Mes')}${pest('resumen', 'Resumen del año')}</nav>
   ${cuerpo}
-  <div class="acciones no-print" style="margin:4px 0 16px"><button class="btn chico" onclick="dlgImportar()">${ic('download')}Importar Excel</button><button class="btn chico" onclick="exportarVentas()">${ic('download')}Exportar a Excel</button></div>`;
+  <div class="acciones no-print" style="margin:4px 0 16px"><button class="btn chico" onclick="dlgImportar()">${ic('download')}Importar Excel</button>${tab === 'mes' ? `<button class="btn chico" onclick="exportarVentas('${mes}')">${ic('download')}Exportar este mes</button>` : ''}<button class="btn chico" onclick="exportarVentas()">${ic('download')}Exportar el año a Excel</button></div>`;
 };
 
 function vistaCaja(anio) {
@@ -1077,7 +1082,7 @@ function vistaCaja(anio) {
   const cobrado = sumar(vs.filter(v => v.estado === 'pagado'), vTotal);
   const ter = vs.filter(esTercero), pro = vs.filter(v => !esTercero(v));
   const bloque = (t, xs) => `<div class="fila entre" style="padding:.35rem 0;border-top:1px solid var(--borde)"><span>${t}<span class="sec" style="display:block;font-size:.85rem">${xs.length} ${xs.length === 1 ? 'arriendo' : 'arriendos'} · venta ${peso(sumar(xs, vNeto))}</span></span><b class="num">${peso(sumar(xs, vMargen))}</b></div>`;
-  if (!vs.length) return `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay ventas de ${anio}. Agrega un arriendo o importa tu Excel.</p></div>`;
+  if (!vs.length) return `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay ventas de ${anio}. Agrega una orden de compra o importa tu Excel.</p></div>`;
   return `
   <div class="kpis k3">
     ${kpiM('', pesoCorto(ventasN), 'Ventas netas', 'dollar')}
@@ -1092,18 +1097,18 @@ function vistaCaja(anio) {
     <a href="#finanzas?tab=cobrar" style="display:inline-block;margin-top:.5rem">Ver facturas por cobrar ›</a>
   </section>
   <section class="tarjeta">
-    <h2>Margen de ${anio}</h2>
+    <h2>Ganancia de ${anio}</h2>
     ${bloque('Equipos de terceros', ter)}${bloque('Equipos propios', pro)}
-    <p class="ayuda" style="margin:.5rem 0 0">Margen = venta neta menos el valor del proveedor.</p>
+    <p class="ayuda" style="margin:.5rem 0 0">Ganancia = venta neta menos el leasing de los equipos de terceros.</p>
   </section>
   <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)">
-    <div class="lista-cab"><span>Mes</span><span>Ventas</span><span>Proveedores</span><span>Leasing</span><span>Queda</span></div>
+    <div class="lista-cab"><span>Mes</span><span>Ventas</span><span>Equipos de terceros</span><span>Cuotas de leasing</span><span>Queda</span></div>
     ${ms.map(m => { const x = ventas().filter(v => v.mes === m), a = sumar(x, vNeto), c = sumar(x, vCosto), l = cuotaLeasingMes(m), r = a - c - l; return `<a class="lista-fila" href="#finanzas?tab=mes&mes=${m}">
       <span class="celda-pri"><b>${MESES[+m.slice(5, 7) - 1]}</b><span class="sub solo-movil">Ventas ${pesoCorto(a)} · Costos ${pesoCorto(c + l)}</span></span>
       <span class="opc num">${peso(a)}</span><span class="opc num">${peso(c)}</span><span class="opc num">${peso(l)}</span>
       <b class="num" style="${r < 0 ? 'color:var(--ur-t)' : ''}">${pesoCorto(r)}</b></a>`; }).join('')}
   </div>
-  <p class="ayuda">Valores netos, sin IVA. Costos = valor de proveedores + cuotas de leasing. No incluye otros gastos (sueldos, combustible, etc.).${ms.some(m => sumar(ventas().filter(v => v.mes === m), vCosto) === 0) && costo > 0 ? ' El Excel trae el valor del proveedor solo desde octubre: los meses sin costo muestran el margen completo.' : ''}</p>`;
+  <p class="ayuda">Valores netos, sin IVA. Costos = leasing de equipos de terceros + cuotas de leasing propias. No incluye otros gastos (sueldos, combustible, etc.).${ms.some(m => sumar(ventas().filter(v => v.mes === m), vCosto) === 0) && costo > 0 ? ' El Excel trae el leasing de terceros solo desde octubre: los meses sin costo muestran la ganancia completa.' : ''}</p>`;
 }
 
 function vistaCobrar() {
@@ -1134,6 +1139,7 @@ function vistaMes(mes, ms) {
   const lista = [...new Set([...ms, mes])].sort();
   const vs = ventas().filter(v => v.mes === mes).sort((a, b) => a.cliente.localeCompare(b.cliente, 'es'));
   const neto = sumar(vs, vNeto), fact = sumar(vs.filter(v => v.estado === 'facturado' || v.estado === 'pagado'), vNeto);
+  const nEq = v => { const n = v.lineas ? v.lineas.length : 0; return n > 1 ? n + ' equipos' : ''; };
   return `
   <section class="tarjeta nota" style="margin-bottom:12px"><p class="sec" style="margin:0"><b>Por aclarar con el cliente:</b> qué significa el N° EDP. Mientras tanto se guarda tal como viene en el Excel.</p></section>
   <label class="campo" style="margin-bottom:12px">Mes<select onchange="location.hash='finanzas?tab=mes&mes='+this.value">${lista.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nombreMes(m)}</option>`).join('')}</select></label>
@@ -1142,19 +1148,19 @@ function vistaMes(mes, ms) {
     ${kpi('', neto ? Math.round(fact / neto * 100) + ' %' : '—', 'Facturado', 'file')}
     ${kpiM('', pesoCorto(neto - fact), 'Por facturar', 'clock')}
   </div>
-  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.6fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.2fr) 24px">
-    <div class="lista-cab"><span>Cliente</span><span>Equipos</span><span>Neto</span><span>Estado</span><span></span></div>
+  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,1.1fr) 24px">
+    <div class="lista-cab"><span>Cliente</span><span>Equipos</span><span>Neto</span><span>IVA</span><span>Total</span><span>Estado</span><span></span></div>
     ${vs.map(v => `<a class="lista-fila" href="#finanzas?tab=mes" role="button" onclick="dlgVenta('${v.id}');return false">
-      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${esc(v.equipos || 'Sin equipo')}${v.proveedor ? ' · tercero' : ''}</span></span>
-      <span class="opc">${esc(v.equipos || '—')}</span>
-      <span class="opc num">${peso(vNeto(v))}</span>
-      <span class="num-estado" style="text-align:right"><b class="num solo-movil-bloque">${pesoCorto(vNeto(v))}</b>${chipVenta(v)}</span>
+      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${v.oc ? 'OC ' + esc(v.oc) : v.factura ? 'Factura ' + esc(v.factura) : 'Sin factura'}<span class="solo-movil"> · ${esc(nEq(v) || v.equipos || 'sin equipos')}</span></span></span>
+      <span class="opc">${esc(v.equipos || '—')}${nEq(v) ? `<span class="sub">${nEq(v)}${v.proveedor ? ' · con equipos de terceros' : ''}</span>` : v.proveedor ? '<span class="sub">equipo de tercero</span>' : ''}</span>
+      <span class="opc num">${peso(vNeto(v))}</span><span class="opc num">${peso(Math.round(vNeto(v) * 0.19))}</span><span class="opc num"><b>${peso(vTotal(v))}</b></span>
+      <span class="num-estado" style="text-align:right"><b class="num solo-movil-bloque">${pesoCorto(vTotal(v))}</b>${chipVenta(v)}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
+    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc num">${peso(neto)}</span><span class="opc num">${peso(Math.round(neto * 0.19))}</span><span class="opc num">${peso(sumar(vs, vTotal))}</span><span class="solo-movil-bloque num">${pesoCorto(sumar(vs, vTotal))}</span><span class="opc"></span><span class="opc"></span></div>
   </div>
-  <p class="ayuda">Total del mes: neto ${peso(neto)} · IVA ${peso(Math.round(neto * 0.19))} · con IVA ${peso(sumar(vs, vTotal))} · margen ${peso(sumar(vs, vMargen))}</p>`
-  : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">No hay arriendos en ${nombreMes(mes)}.</p><button class="btn cta" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Agregar el primero</button></div>`}`;
+  <p class="ayuda">Toca una fila para ver el detalle de sus equipos y editarlo. Ganancia del mes: ${peso(sumar(vs, vMargen))}.</p>`
+  : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">No hay órdenes de compra en ${nombreMes(mes)}.</p><button class="btn cta" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Agregar la primera</button></div>`}`;
 }
-
 function vistaResumen(anio) {
   const ms = mesesConDatos().filter(m => m.startsWith(anio));
   if (!ms.length) return '<div class="tarjeta vacio">Todavía no hay ventas para resumir.</div>';
@@ -1165,72 +1171,106 @@ function vistaResumen(anio) {
   <div class="kpis k3">
     ${kpiM('', pesoCorto(T.a), 'Ventas del año', 'dollar')}
     ${kpi('', T.a ? Math.round((T.a - T.falta) / T.a * 100) + ' %' : '—', 'Facturado', 'file')}
-    ${kpiM('ok', pesoCorto(T.mar), 'Margen', 'check')}
+    ${kpiM('ok', pesoCorto(T.mar), 'Ganancia', 'check')}
   </div>
   <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,.7fr) minmax(0,1.2fr) minmax(0,.9fr) minmax(0,1.2fr) minmax(0,1.2fr)">
-    <div class="lista-cab"><span>Mes</span><span>Arriendos</span><span>Ventas netas</span><span>% facturado</span><span>Por facturar</span><span>Margen</span></div>
+    <div class="lista-cab"><span>Mes</span><span>Arriendos</span><span>Ventas netas</span><span>% facturado</span><span>Por facturar</span><span>Ganancia</span></div>
     ${fs.map(x => `<a class="lista-fila" href="#finanzas?tab=mes&mes=${x.m}">
       <span class="celda-pri"><b>${MESES[+x.m.slice(5, 7) - 1]}</b><span class="sub solo-movil">${x.n} arriendos · ${x.pct} % facturado</span></span>
       <span class="opc">${x.n}</span><span class="opc num">${peso(x.a)}</span><span class="opc">${x.pct} %</span><span class="opc num">${peso(x.falta)}</span>
       <span class="opc num">${peso(x.mar)}</span><b class="num solo-movil-bloque">${pesoCorto(x.a)}</b></a>`).join('')}
     <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total ${anio}</span><span class="opc">${T.n}</span><span class="opc num">${peso(T.a)}</span><span class="opc">${T.a ? Math.round((T.a - T.falta) / T.a * 100) : 0} %</span><span class="opc num">${peso(T.falta)}</span><span class="opc num">${peso(T.mar)}</span><span class="solo-movil-bloque num">${pesoCorto(T.a)}</span></div>
   </div>
-  <p class="ayuda">Ventas netas, sin IVA. El margen de cada mes está en la pestaña Caja.</p>`;
+  <p class="ayuda">Ventas netas, sin IVA. La ganancia de cada mes está en la pestaña Caja.</p>`;
 }
 
 /* ---- Agregar / editar un arriendo ---- */
+// Equipos de una orden de compra. Las filas antiguas (importadas del Excel) no traen desglose: se muestran como una sola línea con todo el monto.
+const lineasDe = v => v.lineas && v.lineas.length ? v.lineas : [{ id: 'l0', equipo: v.equipos || '', neto: v.neto, tercero: vCosto(v) > 0, leasing: v.proveedor }];
+const camionDeTexto = t => { const n = normTxt(t); return n ? S.camiones.find(c => n.includes(normTxt(c.codigo || c.patente)) || n.includes(normTxt(c.patente))) : null; };
+const filaLinea = l => `<div class="lin">
+  <label class="campo" style="margin-bottom:8px">Equipo<input class="l-equipo" list="lsEquipos2" autocomplete="off" value="${esc(l.equipo)}" placeholder="Ej.: GHO-007"></label>
+  <div class="grid grid-2">
+    <label class="campo" style="margin-bottom:8px">Neto $<input class="l-neto" type="number" min="0" step="any" inputmode="decimal" value="${l.neto ?? ''}"></label>
+    <label class="campo l-leas-w" style="margin-bottom:8px" ${l.tercero ? '' : 'hidden'}>Leasing $<input class="l-leas" type="number" min="0" step="any" inputmode="decimal" value="${l.leasing ?? ''}"></label>
+  </div>
+  <label class="check" style="margin-bottom:6px"><input type="checkbox" class="l-ter" ${l.tercero ? 'checked' : ''}> El equipo no es mío (de un tercero)</label>
+  <div class="fila entre"><span class="sec l-calc"></span><button type="button" class="btn chico peligro" onclick="quitarLinea(this)">Quitar equipo</button></div>
+</div>`;
 function dlgVenta(id, mesPre) {
   const nuevo = id === 'nuevo';
   const v = nuevo ? { mes: mesPre || ymHoy(), area: 'rental', cliente: '', oc: '', edp: '', equipos: '', desde: '', hasta: '', neto: '', proveedor: '', estado: 'pendiente', factura: '', fechaFactura: '', fechaPago: '', notas: '' } : ventas().find(x => x.id === id);
   if (!v) return;
   const t = (n, txt, tipo = 'text', extra = '') => `<label class="campo" style="margin-bottom:10px">${txt}<input name="${n}" type="${tipo}" value="${esc(v[n] ?? '')}" ${extra}></label>`;
-  const d = dialogo(`<form onsubmit="guardarVenta(event,'${id}')"><h2>${nuevo ? 'Nuevo arriendo' : 'Editar arriendo'}</h2>
+  const ls = nuevo ? [{ id: 'l1', equipo: '', neto: '', tercero: false, leasing: null }] : lineasDe(v);
+  const d = dialogo(`<form onsubmit="guardarVenta(event,'${id}')"><h2>${nuevo ? 'Nueva orden de compra' : 'Orden de compra'}</h2>
     <div class="prev-leas" id="prevVenta" aria-live="polite"></div>
     <label class="campo" style="margin:12px 0 10px">Cliente<input name="cliente" required list="lsClientes2" autocomplete="off" value="${esc(v.cliente)}"></label>
     <datalist id="lsClientes2">${clientes().map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
-    ${t('mes', 'Mes en que se factura', 'month', 'required')}
-    ${t('equipos', 'Equipos', 'text', 'placeholder="Ej.: Grúa horquilla 16 ton (GHO-007)"')}
+    <datalist id="lsEquipos2">${S.camiones.map(c => `<option value="${esc(etq(c))}">`).join('')}</datalist>
+    <div class="grid grid-2">${t('oc', 'N° de orden de compra')}${t('mes', 'Mes', 'month', 'required')}</div>
     <div class="grid grid-2">${t('desde', 'Desde', 'date')}${t('hasta', 'Hasta', 'date')}</div>
-    ${t('neto', 'Monto neto ($)', 'number', 'required min="0" step="any" inputmode="decimal"')}
-    ${t('proveedor', 'Valor del proveedor ($) <span class="ayuda">(solo si el equipo es de un tercero)</span>', 'number', 'min="0" step="any" inputmode="decimal"')}
+    <h3 style="margin:.5rem 0">Equipos <span class="sec" style="font-weight:400;font-size:.9rem">(${ls.length === 1 && !v.lineas && /( y | - |,)/.test(v.equipos || '') ? 'este arriendo trae varios equipos juntos: sepáralos y reparte el monto' : 'monto neto de cada uno'})</span></h3>
+    <div id="lineas">${ls.map(filaLinea).join('')}</div>
+    <button type="button" class="btn chico" style="margin-bottom:12px" onclick="agregarLinea()">${ic('plus')}Agregar equipo</button>
     <label class="campo" style="margin-bottom:10px">Estado<select name="estado"><option value="pendiente">Por facturar</option><option value="en revision">En revisión</option><option value="facturado">Facturada</option><option value="pagado">Pagada</option></select></label>
     <div class="grid grid-2">${t('factura', 'N° de factura')}${t('fechaFactura', 'Fecha de factura', 'date')}</div>
     ${t('fechaPago', 'Fecha de pago <span class="ayuda">(cuando paguen)</span>', 'date')}
-    ${t('oc', 'N° de orden de compra <span class="ayuda">(opcional)</span>')}
     ${t('edp', 'N° EDP <span class="ayuda">(por aclarar con el cliente qué significa)</span>')}
-    <label class="campo" style="margin-bottom:0">Notas<textarea name="notas" rows="2">${esc(v.notas)}</textarea></label>
+    <label class="campo" style="margin-bottom:0">Observaciones<textarea name="notas" rows="2">${esc(v.notas)}</textarea></label>
     <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
-    ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarVenta('${id}')">Eliminar arriendo</button>`}</form>`);
+    ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarVenta('${id}')">Eliminar orden de compra</button>`}</form>`);
   d.classList.add('ancho');
   const f = d.querySelector('form'); f.estado.value = v.estado;
-  f.addEventListener('input', () => prevVenta(f)); prevVenta(f);
+  f.addEventListener('input', () => prevVenta(f));
+  f.addEventListener('change', e => {
+    const fila = e.target.closest('.lin');
+    if (fila && e.target.classList.contains('l-equipo')) { const c = camionDeTexto(e.target.value); if (c) fila.querySelector('.l-ter').checked = c.propiedad === 'tercero'; }
+    if (fila) { const ter = fila.querySelector('.l-ter').checked; fila.querySelector('.l-leas-w').hidden = !ter; if (!ter) fila.querySelector('.l-leas').value = ''; }
+    prevVenta(f);
+  });
+  prevVenta(f);
 }
+function agregarLinea() { $('#lineas').insertAdjacentHTML('beforeend', filaLinea({ id: 'l' + Date.now(), equipo: '', neto: '', tercero: false, leasing: null })); prevVenta($('#lineas').closest('form')); }
+function quitarLinea(btn) {
+  const fila = btn.closest('.lin'), f = fila.closest('form');
+  if (f.querySelectorAll('.lin').length === 1) { fila.querySelectorAll('input[type=text],input[type=number],.l-equipo').forEach(i => i.value = ''); fila.querySelector('.l-ter').checked = false; fila.querySelector('.l-leas-w').hidden = true; }
+  else fila.remove();
+  prevVenta(f);
+}
+function leerLineas(f) {
+  return [...f.querySelectorAll('.lin')].map((r, i) => { const ter = r.querySelector('.l-ter').checked, le = r.querySelector('.l-leas').value;
+    return { id: 'l' + (i + 1), equipo: r.querySelector('.l-equipo').value.trim(), neto: Number(r.querySelector('.l-neto').value) || 0, tercero: ter, leasing: ter && le !== '' ? Number(le) : null }; });
+}
+// Cálculos al instante: cada equipo muestra su IVA y total; arriba, los totales de la orden
 function prevVenta(f) {
-  const d = Object.fromEntries(new FormData(f)), neto = Number(d.neto) || 0, prov = Number(d.proveedor) || 0;
-  const v = { neto, proveedor: prov, fechaFactura: d.fechaFactura, cliente: d.cliente };
-  const vence = venceVenta(v);
-  $('#prevVenta').innerHTML = `<dl><dt>IVA 19 %</dt><dd>${peso(Math.round(neto * 0.19))}</dd><dt>Total con IVA</dt><dd class="grande">${peso(vTotal(v))}</dd>
-    <dt>Margen</dt><dd>${peso(neto - prov)}</dd>${vence ? `<dt>Vence el pago</dt><dd>${fecha(dISO(vence))} <span class="sec">(${plazoDe(v)} días)</span></dd>` : ''}</dl>`;
+  const d = Object.fromEntries(new FormData(f)), ls = leerLineas(f);
+  f.querySelectorAll('.lin').forEach((r, i) => { const n = ls[i].neto; r.querySelector('.l-calc').textContent = `IVA ${peso(Math.round(n * 0.19))} · Total ${peso(Math.round(n * 1.19))}`; });
+  const neto = sumar(ls, l => l.neto), leas = sumar(ls, l => l.leasing || 0);
+  const v = { neto, proveedor: leas, fechaFactura: d.fechaFactura, cliente: d.cliente }, vence = venceVenta(v);
+  $('#prevVenta').innerHTML = `<dl><dt>Neto</dt><dd>${peso(neto)}</dd><dt>IVA 19 %</dt><dd>${peso(Math.round(neto * 0.19))}</dd><dt>Total con IVA</dt><dd class="grande">${peso(vTotal(v))}</dd>
+    ${leas ? `<dt>Leasing (equipos de terceros)</dt><dd>${peso(leas)}</dd>` : ''}<dt>Ganancia</dt><dd>${peso(neto - leas)}</dd>${vence ? `<dt>Vence el pago</dt><dd>${fecha(dISO(vence))} <span class="sec">(${plazoDe(v)} días)</span></dd>` : ''}</dl>`;
 }
 function guardarVenta(ev, id) {
   ev.preventDefault();
-  const d = Object.fromEntries(new FormData(ev.target)), neto = Number(d.neto);
-  if (!(neto >= 0) || d.neto === '') { toast('Escribe el monto neto.'); return; }
+  const f = ev.target, d = Object.fromEntries(new FormData(f)), ls = leerLineas(f).filter(l => l.equipo || l.neto > 0);
+  if (!ls.length) { toast('Agrega al menos un equipo con su monto neto.'); return; }
   if (d.desde && d.hasta && d.hasta < d.desde) { toast('La fecha "hasta" debe ser posterior a "desde".'); return; }
-  const dato = { mes: d.mes, area: 'rental', cliente: d.cliente.trim(), oc: d.oc.trim(), edp: d.edp.trim(), equipos: d.equipos.trim(), desde: d.desde, hasta: d.hasta, neto,
-    proveedor: d.proveedor === '' ? null : Number(d.proveedor), estado: d.estado, factura: d.factura.trim(), fechaFactura: d.fechaFactura, fechaPago: d.fechaPago, notas: d.notas.trim() };
+  const neto = sumar(ls, l => l.neto), leas = sumar(ls, l => l.leasing || 0);
+  const dato = { mes: d.mes, area: 'rental', cliente: d.cliente.trim(), oc: d.oc.trim(), edp: d.edp.trim(), lineas: ls.map((l, i) => ({ ...l, id: 'l' + (i + 1) })), equipos: ls.map(l => l.equipo).filter(Boolean).join(' - '),
+    desde: d.desde, hasta: d.hasta, neto, proveedor: ls.some(l => l.tercero) ? leas : null, estado: d.estado, factura: d.factura.trim(), fechaFactura: d.fechaFactura, fechaPago: d.fechaPago, notas: d.notas.trim() };
   if (dato.fechaPago) dato.estado = 'pagado';
   else if (dato.fechaFactura && (dato.estado === 'pendiente' || dato.estado === 'en revision')) dato.estado = 'facturado';
   if (dato.estado === 'facturado' && !dato.fechaFactura) dato.fechaFactura = isoLocal(Date.now());
   if (!clienteDe(dato)) clientes().push({ id: 'cl' + Date.now(), nombre: dato.cliente, contacto: '', telefono: '', correo: '' });
   if (id === 'nuevo') ventas().push({ id: 'v' + Date.now(), origen: 'app', ...dato }); else Object.assign(ventas().find(x => x.id === id), dato);
-  guardar(); cerrarDlg(); toast('Arriendo guardado'); render();
+  guardar(); cerrarDlg(); toast('Orden de compra guardada'); render();
 }
 function quitarVenta(id) {
   const v = ventas().find(x => x.id === id); if (!v) return;
-  window._borrarVenta = () => { S.ventas = ventas().filter(x => x.id !== id); guardar(); cerrarDlg(); toast('Arriendo eliminado'); render(); };
+  window._borrarVenta = () => { S.ventas = ventas().filter(x => x.id !== id); guardar(); cerrarDlg(); toast('Orden de compra eliminada'); render(); };
   cerrarDlg();
-  dialogo(`<h2>¿Eliminar este arriendo?</h2><p style="margin:0">${esc(v.cliente)} · ${peso(vNeto(v))}<br><b>No se puede deshacer.</b></p>
+  dialogo(`<h2>¿Eliminar esta orden de compra?</h2><p style="margin:0">${esc(v.cliente)} · ${peso(vNeto(v))}<br><b>No se puede deshacer.</b></p>
     <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="_borrarVenta()">Sí, eliminar</button></div>`);
 }
 // Registrar el pago de una factura
@@ -1300,7 +1340,7 @@ function leerLibro(wb, anio) {
   });
   return out;
 }
-const claveVenta = v => [v.mes, v.area, normNombre(v.cliente), normNombre(v.equipos), v.desde, v.hasta, Math.round(v.neto)].join('|');
+const claveVenta = v => [v.mes, v.area, normNombre(v.cliente), v.desde, v.hasta, Math.round(v.neto)].join('|');
 function dlgImportar() {
   window._imp = null;
   dialogo(`<form onsubmit="aplicarImportacion(event)"><h2>Importar desde Excel</h2>
@@ -1346,14 +1386,34 @@ function aplicarImportacion(ev) {
   im.cNuevos.forEach((n, i) => clientes().push({ id: 'cl' + Date.now() + '-' + i, nombre: n, contacto: '', telefono: '', correo: '' }));
   guardar(); cerrarDlg(); toast(`Importados ${im.nuevas.length} arriendos`); window._imp = null; render();
 }
-async function exportarVentas() {
+// Estructura fija del Excel (la de la empresa): columna A vacía, sección RENTAL, títulos, una fila por orden de compra y fila Total. Se puede volver a importar.
+const COLS_EXCEL = ['Cliente', 'N° EDP', 'EQUIPO', 'FECHA DE INICIO', 'FECHA DE TERMINO', 'MONTO NETO $', '19 % IVA $', 'TOTAL $', 'Estado', 'N° Factura', 'Fecha Facturación', 'Observaciones', 'Valor proveedor', 'Margen'];
+const fechaX = iso => iso ? new Date(iso + 'T12:00:00Z') : null;
+const numX = t => /^\d+$/.test(String(t || '')) ? Number(t) : (t || '');
+function hojaMes(m) {
+  const vs = ventas().filter(v => v.mes === m).sort((a, b) => a.cliente.localeCompare(b.cliente, 'es'));
+  const filas = vs.map(v => ['', v.cliente, numX(v.edp), v.equipos, fechaX(v.desde), fechaX(v.hasta), vNeto(v), Math.round(vNeto(v) * 0.19), vTotal(v), v.estado, numX(v.factura), fechaX(v.fechaFactura), v.notas, vCosto(v) || null, vMargen(v)]);
+  const tot = sumar(vs, vTotal), fact = sumar(vs.filter(v => v.estado === 'facturado' || v.estado === 'pagado'), vTotal);
+  const aoa = [[], ['', 'RENTAL'], ['', ...COLS_EXCEL], ...filas, ['', '', '', '', '', 'Total', sumar(vs, vNeto), sumar(vs, v => Math.round(vNeto(v) * 0.19)), tot],
+    ['', '', '', '', '', 'Total Facturado', '', fact], ['', '', '', '', '', '% cumplimiento', '', tot ? fact / tot : 0]];
+  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+  ws['!cols'] = [2, 24, 9, 46, 15, 17, 16, 14, 15, 12, 17, 17, 30, 16, 14].map(w => ({ wch: w }));
+  Object.keys(ws).filter(k => k[0] !== '!').forEach(k => {
+    const c = XLSX.utils.decode_cell(k), cel = ws[k];
+    if ([4, 5, 11].includes(c.c) && cel.t === 'd') cel.z = 'dd-mm-yyyy';
+    else if ([6, 7, 8, 13, 14].includes(c.c) && cel.t === 'n') cel.z = '#,##0';
+  });
+  const ult = XLSX.utils.encode_cell({ r: aoa.length - 1, c: 8 }); if (ws[ult]) ws[ult].z = '0.0%';
+  return ws;
+}
+async function exportarVentas(mes) {
   try { await cargarXLSX(); } catch (e) { toast(e.message); return; }
-  const cab = ['Mes', 'Cliente', 'N° OC', 'N° EDP', 'Equipos', 'Desde', 'Hasta', 'Monto neto $', 'IVA 19 % $', 'Total $', 'Valor proveedor', 'Margen', 'Estado', 'N° factura', 'Fecha factura', 'Vence', 'Fecha de pago', 'Notas'];
-  const ET = { pendiente: 'Por facturar', 'en revision': 'En revisión', facturado: 'Facturada', pagado: 'Pagada' };
-  const filas = ventas().slice().sort((a, b) => a.mes.localeCompare(b.mes) || a.cliente.localeCompare(b.cliente, 'es')).map(v =>
-    [nombreMes(v.mes), v.cliente, v.oc, v.edp, v.equipos, v.desde, v.hasta, vNeto(v), Math.round(vNeto(v) * 0.19), vTotal(v), vCosto(v) || '', vMargen(v), ET[v.estado] || v.estado, v.factura, v.fechaFactura, v.estado === 'pagado' ? '' : (venceVenta(v) || ''), v.fechaPago, v.notas]);
-  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cab, ...filas]), 'Ventas');
-  XLSX.writeFile(wb, `Ventas y caja ${isoLocal(Date.now())}.xlsx`); toast('Excel descargado');
+  const ms = mesesConDatos(), anio = mes ? mes.slice(0, 4) : (ms[ms.length - 1] || ymHoy()).slice(0, 4);
+  const lista = mes ? [mes] : ms.filter(m => m.startsWith(anio));
+  if (!lista.length) { toast('No hay datos para exportar.'); return; }
+  const wb = XLSX.utils.book_new();
+  lista.forEach(m => XLSX.utils.book_append_sheet(wb, hojaMes(m), MESES[+m.slice(5, 7) - 1]));
+  XLSX.writeFile(wb, mes ? `Ventas ${nombreMes(mes)}.xlsx` : `Ventas ${anio}.xlsx`); toast('Excel descargado');
 }
 /* === fin Ventas y caja === */
 
