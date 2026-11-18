@@ -472,6 +472,7 @@ const fechaCorta = d => new Date(d).toLocaleDateString('es-CL', { day: '2-digit'
 const hora = d => new Date(d).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', hour12: false });
 const diasHasta = d => Math.round((new Date(d).setHours(0, 0, 0, 0) - hoy0()) / DIA);
 // Patentes chilenas: HKTZ48 → HK·TZ·48 y AB1234 → AB·12·34; cualquier otra se muestra tal cual
+const etq = c => c.codigo || fmtPatente(c.patente); // nombre visible: el código del equipo (ECP-W49) o la patente
 const fmtPatente = p => String(p).toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^([A-Z]{2})([A-Z]{2}|[0-9]{2})([0-9]{2})$/, '$1·$2·$3');
 const iniciales = n => String(n).split(' ').filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase();
 const primerNombre = n => String(n).split(' ')[0];
@@ -564,7 +565,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '39'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '40'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -650,7 +651,7 @@ async function traerLecturas() {
     if (firma === FIRMA && !cambioCamion && !cambioEstado) return;
     FIRMA = firma;
     const ult = filas.length ? filas.reduce((a, b) => (a.id > b.id ? a : b)) : null;
-    if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID && ult.origen === 'whatsapp') toast(`Llegó por WhatsApp: ${fmtPatente(ult.patente)} · ${n1(ult.valor)} h`);
+    if (ult && ULTIMO_ID !== null && ult.id > ULTIMO_ID && ult.origen === 'whatsapp') toast(`Llegó por WhatsApp: ${etq(S.camiones.find(c => c.patente === ult.patente) || { patente: ult.patente })} · ${n1(ult.valor)} h`);
     if (ult) ULTIMO_ID = ult.id;
     S.camiones.forEach(c => {
       const ls = filas.filter(f => f.patente === c.patente);
@@ -721,7 +722,8 @@ function estadoPlazo(d, urgente, aviso) {
   if (d === 1) txt = 'Vence mañana';
   return { e, d, txt };
 }
-const estadoRT = c => estadoPlazo(diasHasta(dISO(c.rtVence)), S.config.diasUrgente, S.config.diasPorVencer);
+const estadoRT = c => c.rtVence ? estadoPlazo(diasHasta(dISO(c.rtVence)), S.config.diasUrgente, S.config.diasPorVencer) : { e: 'ok', d: null, txt: 'Sin fecha cargada' };
+const fechaRT = c => c.rtVence ? fechaRT(c) : 'Sin fecha';
 const estadoContrato = k => estadoPlazo(diasHasta(dISO(k.termino)), S.config.diasContratoUrgente, S.config.diasContratoAviso);
 function promedioDiario(c) {
   const ls = lecturasOk(c); if (ls.length < 2) return 0;
@@ -783,7 +785,7 @@ function tarjetaCamion(c) {
   const k = contrato(c.contratoId), mo = motivo(c);
   return `<a class="cam-card" href="#camion/${c.id}" data-buscar="${esc(sinTildes(c.patente + ' ' + c.tipo + ' ' + (c.modelo || '') + ' ' + (k ? k.empresa : '')))}">
     <span class="foto">${ic('truck')}<span class="punto ${mo.e}"></span></span>
-    <span class="info"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)} · ${k ? esc(k.empresa) : 'Disponible'}</span>${estado(mo.e, mo.txt)}</span></a>`;
+    <span class="info"><b>${etq(c)}</b><span class="sub">${esc(c.tipo)} · ${k ? esc(k.empresa) : 'Disponible'}</span>${estado(mo.e, mo.txt)}</span></a>`;
 }
 function filtrarCamiones(txt) {
   const q = sinTildes(txt.trim()).replace(/[^a-z0-9 ]/g, '');
@@ -801,10 +803,10 @@ function itemsAtencion() {
       msg: `${k.empresa}: contrato ${ec.txt.toLowerCase()} (${fechaCorta(dISO(k.termino))})`, href: '#contrato/' + k.id });
   });
   S.camiones.forEach(c => {
-    const p = fmtPatente(c.patente), rt = estadoRT(c), h = estadoHoras(c), s = sinReporte(c), m = estadoMant(c);
+    const p = etq(c), rt = estadoRT(c), h = estadoHoras(c), s = sinReporte(c), m = estadoMant(c);
     if (m.e !== 'ok') xs.push({ tipo: 'Mantención', e: m.e, titulo: p, detalle: `Mantención de las ${n0(m.prox)} h: ${m.txt.toLowerCase()}${m.fechaProx ? ' · aprox. el ' + fecha(m.fechaProx) : ''}`,
       msg: `${p} (${c.tipo}): mantención de las ${n0(m.prox)} h, ${m.txt.toLowerCase()}`, href: '#camion/' + c.id });
-    if (rt.e !== 'ok') xs.push({ tipo: 'Revisión técnica', e: rt.e, titulo: p, detalle: `${rt.txt} (${fecha(dISO(c.rtVence))})`,
+    if (rt.e !== 'ok') xs.push({ tipo: 'Revisión técnica', e: rt.e, titulo: p, detalle: `${rt.txt} (${fechaRT(c)})`,
       msg: `${p} (${c.tipo}): ${rt.e === 'vencido' ? rt.txt.toUpperCase() : rt.txt.toLowerCase() + ' (' + fechaCorta(dISO(c.rtVence)) + ')'}`, href: '#camion/' + c.id });
     if (h.e !== 'ok') xs.push({ tipo: 'Horómetro', e: h.e, titulo: p, detalle: h.txt + (h.pct < 100 && h.fechaLim ? ` · llega al límite aprox. el ${fecha(h.fechaLim)}` : ''),
       msg: `${p} (${c.tipo}): ${Math.floor(h.pct)}% del límite${h.pct < 100 && h.fechaLim ? ', lo alcanza aprox. el ' + fechaCorta(h.fechaLim) : ''}`, href: '#camion/' + c.id });
@@ -837,7 +839,7 @@ addEventListener('offline', () => { pintarRed(); render(); });
 const MODULOS = [
   ['', [['inicio', 'home', 'Inicio'], ['avisos', 'bell', 'Avisos']]],
   ['MANTENIMIENTO', [['flota', 'truck', 'Flota'], ['horometros', 'gauge', 'Horómetros'], ['revisiones', 'shield', 'Revisiones técnicas']]],
-  ['ADMINISTRACIÓN Y FINANZAS', [['contratos', 'file', 'Contratos'], ['finanzas', 'dollar', 'Facturas y pagos'], ['leasing', 'calc', 'Leasing']]],
+  ['ADMINISTRACIÓN Y FINANZAS', [['clientes', 'building', 'Clientes'], ['contratos', 'file', 'Contratos'], ['finanzas', 'dollar', 'Facturas y pagos'], ['leasing', 'calc', 'Leasing']]],
 ]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
 if (REAL) MODULOS[2][1].push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
 const MENU = MODULOS.flatMap(m => m[1]);
@@ -923,6 +925,7 @@ VISTAS.mas = () => {
   </div>
   <h2 class="grupo-mas">Administración y finanzas</h2>
   <div class="menu-grilla">
+    ${acceso('clientes', 'building', 'Clientes', '#2563EB')}
     ${acceso('contratos', 'file', 'Contratos', '#2563EB')}
     ${acceso('finanzas', 'dollar', 'Facturas y pagos', '#2563EB')}
     ${acceso('leasing', 'calc', 'Leasing', '#2563EB')}
@@ -940,6 +943,56 @@ VISTAS.finanzas = () => `
   <a class="tarjeta fila" style="text-decoration:none;color:inherit;justify-content:space-between" href="#contratos">
     <span><b>Contratos</b><span class="sec" style="display:block">${S.contratos.length} ${S.contratos.length === 1 ? 'contrato' : 'contratos'}</span></span>${ic('chevron')}</a>`;
 /* === fin Facturas y pagos === */
+
+/* === Clientes (v40): empresas a las que se arrienda === */
+const clientes = () => S.clientes || (S.clientes = []);
+const normNombre = t => String(t || '').trim().toLowerCase();
+VISTAS.clientes = () => {
+  const cs = clientes().slice().sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const nContratos = c => S.contratos.filter(k => normNombre(k.empresa) === normNombre(c.nombre)).length;
+  return `
+  <div class="cab"><div><h1>Clientes</h1><p class="sec" style="margin:0">Las empresas a las que arriendas.</p></div>
+    <button class="btn chico cta no-print" onclick="dlgCliente('nuevo')">${ic('plus')}Nuevo cliente</button></div>
+  ${cs.length ? `<div class="lista" style="--cols:minmax(0,2fr) minmax(0,1.6fr) minmax(0,1fr) 24px">
+    <div class="lista-cab"><span>Cliente</span><span>Contacto</span><span>Contratos</span><span></span></div>
+    ${cs.map(c => `<a class="lista-fila" href="#clientes" role="button" onclick="dlgCliente('${c.id}');return false">
+      <span class="celda-pri"><b>${esc(c.nombre)}</b><span class="sub">${esc(c.contacto || c.telefono || c.correo || 'Sin contacto')}</span></span>
+      <span class="opc">${esc(c.contacto || '—')}<span class="sub">${esc(c.telefono || c.correo || '')}</span></span>
+      <span class="opc num">${nContratos(c)}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
+  </div>` : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay clientes.</p><button class="btn cta" onclick="dlgCliente('nuevo')">${ic('plus')}Agregar el primero</button></div>`}`;
+};
+function dlgCliente(id) {
+  const nuevo = id === 'nuevo', c = nuevo ? { nombre: '', contacto: '', telefono: '', correo: '' } : clientes().find(x => x.id === id);
+  if (!c) return;
+  const campo = (n, t, tipo = 'text', extra = '') => `<label class="campo" style="margin-bottom:10px">${t}<input name="${n}" type="${tipo}" value="${esc(c[n])}" ${extra}></label>`;
+  dialogo(`<form onsubmit="guardarCliente(event,'${id}')"><h2>${nuevo ? 'Nuevo cliente' : 'Editar cliente'}</h2>
+    ${campo('nombre', 'Empresa', 'text', 'required autocomplete="off"')}
+    ${campo('contacto', 'Persona de contacto <span class="ayuda">(opcional)</span>')}
+    ${campo('telefono', 'Teléfono <span class="ayuda">(opcional)</span>', 'tel', 'placeholder="+56 9 1234 5678"')}
+    ${campo('correo', 'Correo <span class="ayuda">(opcional)</span>', 'email')}
+    <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
+    ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarCliente('${id}')">Eliminar cliente</button>`}</form>`);
+}
+function guardarCliente(ev, id) {
+  ev.preventDefault();
+  const d = Object.fromEntries(new FormData(ev.target));
+  const dato = { nombre: d.nombre.trim(), contacto: d.contacto.trim(), telefono: d.telefono.trim(), correo: d.correo.trim() };
+  if (!dato.nombre) { toast('Escribe el nombre de la empresa.'); return; }
+  if (clientes().some(c => c.id !== id && normNombre(c.nombre) === normNombre(dato.nombre))) { toast('Ya existe un cliente con ese nombre.'); return; }
+  if (id === 'nuevo') clientes().push({ id: 'cl' + Date.now(), ...dato }); else Object.assign(clientes().find(x => x.id === id), dato);
+  guardar(); cerrarDlg(); toast('Cliente guardado'); render();
+}
+function quitarCliente(id) {
+  const c = clientes().find(x => x.id === id); if (!c) return;
+  const n = S.contratos.filter(k => normNombre(k.empresa) === normNombre(c.nombre)).length;
+  window._borrarCliente = () => { S.clientes = clientes().filter(x => x.id !== id); guardar(); cerrarDlg(); toast('Cliente eliminado'); render(); };
+  cerrarDlg();
+  dialogo(`<h2>¿Eliminar a ${esc(c.nombre)}?</h2><p style="margin:0">Se borra de la lista de clientes. <b>No se puede deshacer.</b></p>
+    ${n ? `<p class="sec" style="margin:.5rem 0 0">Sus ${n === 1 ? 'contrato no se borra' : n + ' contratos no se borran'}.</p>` : ''}
+    <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="_borrarCliente()">Sí, eliminar</button></div>`);
+}
+/* === fin Clientes === */
 
 /* === Leasing (v39): cuota de cada equipo y cuánto queda del arriendo === */
 const leasings = () => S.leasing || (S.leasing = []);
@@ -992,7 +1045,7 @@ function dlgLeasing(id) {
   dialogo(`<form class="ancho-f" onsubmit="guardarLeasing(event,'${id}')"><h2>${nuevo ? 'Nuevo leasing' : 'Editar leasing'}</h2>
     <div class="prev-leas" id="prevLeas" aria-live="polite"></div>
     <label class="campo" style="margin:12px 0 10px">Equipo<input name="equipo" required value="${esc(l.equipo)}" list="lsEquipos" placeholder="Patente o nombre" autocomplete="off"></label>
-    <datalist id="lsEquipos">${S.camiones.map(c => `<option value="${esc(fmtPatente(c.patente))}">`).join('')}</datalist>
+    <datalist id="lsEquipos">${S.camiones.map(c => `<option value="${esc(etq(c))}">`).join('')}</datalist>
     ${campo('valor', 'Valor del equipo ($)', 'required')}
     ${campo('pie', 'Pie ($)')}
     ${campo('plazo', 'Plazo (meses)', 'required min="1" max="120" step="1"')}
@@ -1126,7 +1179,7 @@ VISTAS.inicio = () => {
   const mants = cs.map(c => ({ c, m: estadoMant(c) })).sort((x, y) => x.m.resta - y.m.resta).slice(0, 5);
   // 3) Próximos vencimientos (90 días): revisiones técnicas y contratos
   const venc = [
-    ...cs.map(c => ({ que: 'Revisión técnica', nombre: fmtPatente(c.patente), f: dISO(c.rtVence), e: estadoRT(c).e, href: '#camion/' + c.id })),
+    ...cs.map(c => ({ que: 'Revisión técnica', nombre: etq(c), f: dISO(c.rtVence), e: estadoRT(c).e, href: '#camion/' + c.id })),
     ...S.contratos.map(k => ({ que: 'Contrato', nombre: k.empresa, f: dISO(k.termino), e: estadoContrato(k).e, href: '#contrato/' + k.id })),
   ].map(v => ({ ...v, d: diasHasta(v.f) })).filter(v => v.d <= 90).sort((x, y) => x.d - y.d).slice(0, 5);
   // 4) Últimos registros del horómetro (WhatsApp o app)
@@ -1146,7 +1199,7 @@ VISTAS.inicio = () => {
     <section class="tarjeta">
       <div class="titulo-tarjeta"><h2>Próximas mantenciones</h2><a class="ver-todo" href="#horometros">Ver todo →</a></div>
       ${mants.length ? mants.map(({ c, m }) => `<a class="fila-inicio" href="#camion/${c.id}"><span class="cuerpo">
-        <span class="fila entre"><b>${fmtPatente(c.patente)}</b>${estado(m.e, m.resta > 0 ? `faltan ${n0(m.resta)} h` : `atrasada ${n0(-m.resta)} h`)}</span>
+        <span class="fila entre"><b>${etq(c)}</b>${estado(m.e, m.resta > 0 ? `faltan ${n0(m.resta)} h` : `atrasada ${n0(-m.resta)} h`)}</span>
         <span class="barra ${m.e}" role="img" aria-label="${Math.round(Math.min(100, Math.max(0, (1 - m.resta / S.config.intervaloMant) * 100)))}% del camino a la próxima mantención"><span style="width:${Math.min(100, Math.max(0, (1 - m.resta / S.config.intervaloMant) * 100))}%"></span></span>
         <span class="sub num">${ultima(c) ? `Lleva ${n1(ultima(c).valor)} / ${n0(m.prox)} h` : `Sin registros · próxima a las ${n0(m.prox)} h`}</span></span>${ic('chevron')}</a>`).join('')
         : `<p class="sec">Aún no hay camiones.</p><a class="btn chico cta" href="#editar/nuevo">${ic('plus')}Agregar camión</a>`}
@@ -1161,7 +1214,7 @@ VISTAS.inicio = () => {
   <section class="tarjeta">
     <div class="titulo-tarjeta"><h2>Últimos registros</h2><a class="ver-todo" href="#horometros">Ver todo →</a></div>
     ${regs.length ? regs.map(({ c, l }) => `<a class="fila-inicio" href="#camion/${c.id}"><span class="chip-ico">${ic(l.origen === 'whatsapp' ? 'send' : 'gauge')}</span>
-      <span class="cuerpo"><b>${fmtPatente(c.patente)} · <span class="num">${n1(l.valor)} h</span></b>
+      <span class="cuerpo"><b>${etq(c)} · <span class="num">${n1(l.valor)} h</span></b>
       <span class="sub">${cuando(l.fecha)} · ${l.origen === 'whatsapp' ? 'por WhatsApp' : l.origen === 'ejemplo' ? 'historial' : 'en la app'} · ${esc(l.quien || usuario(l.usuario).nombre)}</span></span>${ic('chevron')}</a>`).join('')
       : '<p class="sec" style="margin:0">Todavía no hay registros del horómetro.</p>'}
   </section>`;
@@ -1190,7 +1243,7 @@ VISTAS.flota = (_, q) => {
   ${lista.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.8fr) minmax(0,1.4fr) minmax(0,1.2fr) 24px">
     <div class="lista-cab"><span>Camión</span><span>Arriendo</span><span>Rev. técnica</span><span>Mantención</span><span></span></div>
     ${lista.map(c => { const k = contrato(c.contratoId), rt = estadoRT(c), m = estadoMant(c), mo = motivo(c); return `<a class="lista-fila" href="#camion/${c.id}">
-      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${k ? esc(k.empresa) : 'Disponible'}</span></span></span>
+      <span class="celda-pri"><b>${etq(c)}</b><span class="sub">${esc(c.tipo)}${c.propiedad === 'tercero' ? ' · Tercero' : ''}<span class="solo-movil"> · ${k ? esc(k.empresa) : 'Disponible'}</span></span></span>
       <span class="opc">${k ? `${esc(k.empresa)}<span class="sub">hasta ${fecha(dISO(k.termino))}</span>` : '<span class="sec">Disponible</span>'}</span>
       <span class="opc">${estado(rt.e, rt.txt)}</span>
       <span class="opc">${estado(m.e, m.txt)}<span class="sub">próxima a las ${n0(m.prox)} h</span></span>
@@ -1211,8 +1264,8 @@ VISTAS.camion = id => {
   const max = Math.max(12, ...dias.map(x => x.h));
   const ec = k && estadoContrato(k);
   return `
-  <div class="cab"><div><h1 class="patente">${fmtPatente(c.patente)}</h1><p class="sec" style="margin:0">${esc(c.tipo)} · ${esc(c.modelo)}</p></div>
-    <div class="chips">${chipArriendo(c)}${chip(motivo(c).e, motivo(c).txt)}</div></div>
+  <div class="cab"><div><h1 class="patente">${etq(c)}</h1><p class="sec" style="margin:0">${[c.tipo, c.modelo].filter(Boolean).map(esc).join(' · ')}</p></div>
+    <div class="chips">${chipArriendo(c)}<span class="chip">${c.propiedad === 'tercero' ? 'Tercero' : 'Propio'}</span>${chip(motivo(c).e, motivo(c).txt)}</div></div>
   ${k ? `<section class="tarjeta borde-${ec.e}">
       <div class="titulo-tarjeta"><h2>Arrendado a ${esc(k.empresa)}</h2>${chip(ec.e, ec.txt)}</div>
       <dl class="dl"><dt>Contrato</dt><dd>${esc(k.numero)}</dd><dt>Vigencia</dt><dd>${fecha(dISO(k.inicio))} al ${fecha(dISO(k.termino))}</dd><dt>Faena</dt><dd>${esc(k.faena)}</dd>
@@ -1226,7 +1279,7 @@ VISTAS.camion = id => {
   <div class="grid grid-2">
     <section class="tarjeta borde-${rt.e}">
       <h2>Revisión técnica</h2>
-      <p style="margin:0">Vence el <b>${fecha(dISO(c.rtVence))}</b></p>
+      <p style="margin:0">${c.rtVence ? `Vence el <b>${fechaRT(c)}</b>` : 'Todavía no hay fecha de vencimiento.'}</p>
       <div class="chips" style="margin:.5rem 0 0">${chip(rt.e, rt.txt)}</div>
       <h3 style="margin:1rem 0 0;font-size:1rem">Documentos</h3>
       ${(c.docsRT || []).length ? `<ul class="docs">${c.docsRT.map(d => `<li><button class="doc" onclick="abrirDocRT('${c.id}','${d.id}')" title="Abrir"><b>${esc(d.nombre)}</b><span class="sec">Subido el ${fecha(new Date(d.fecha))}</span></button>
@@ -1234,7 +1287,7 @@ VISTAS.camion = id => {
         : '<p class="sec" style="margin:.25rem 0 .75rem">Todavía no hay documentos. Sube el certificado en PDF o foto.</p>'}
       <div class="acciones no-print">
         <label class="btn chico cta">${ic('plus')}Subir documento<input type="file" accept="application/pdf,image/*" hidden onchange="subirDocRT(this,'${c.id}')"></label>
-        <button class="btn chico" onclick="dlgFechaRT('${c.id}')">Cambiar vencimiento</button>
+        <button class="btn chico" onclick="dlgFechaRT('${c.id}')">${c.rtVence ? 'Cambiar vencimiento' : 'Poner fecha de vencimiento'}</button>
       </div>
     </section>
     <section class="tarjeta borde-${h.e}">
@@ -1281,7 +1334,7 @@ VISTAS.camion = id => {
 };
 function registrarMant(id) {
   const c = camion(id), u = ultima(c, true), actual = u ? u.valor : 0, m = estadoMant(c);
-  const txt = prompt(`¿Con qué horómetro se hizo la mantención de ${fmtPatente(c.patente)}?`, n1(actual).replace(/\./g, ''));
+  const txt = prompt(`¿Con qué horómetro se hizo la mantención de ${etq(c)}?`, n1(actual).replace(/\./g, ''));
   if (txt === null) return;
   const v = leerNumero(txt);
   if (isNaN(v) || v <= 0) { toast('Escribe el horómetro solo con números.'); return; }
@@ -1336,7 +1389,7 @@ const botonesDlg = (txt, cls = 'pri') => `<div class="acciones" style="margin-to
 function dlgRegistrar(id) {
   const c = camion(id), h = estadoHoras(c);
   dialogo(`<form onsubmit="registrarDueno(event,'${id}')"><h2>Registrar horómetro</h2>
-    <label class="campo" style="margin-bottom:.5rem">¿Cuánto marca ${fmtPatente(c.patente)}?
+    <label class="campo" style="margin-bottom:.5rem">¿Cuánto marca ${etq(c)}?
       <input name="lectura" inputmode="decimal" autocomplete="off" placeholder="Ej.: ${n0(Math.floor(h.actual) + 8)}"></label>
     <p class="ayuda" style="margin:0">Debe ser igual o mayor que ${n1(h.actual)} h.</p>
     ${botonesDlg('Registrar', 'cta')}</form>`);
@@ -1344,7 +1397,7 @@ function dlgRegistrar(id) {
 function dlgLimite(id) {
   const c = camion(id), cfg = S.config;
   dialogo(`<form onsubmit="guardarLimite(event,'${id}')"><h2>Límite de horas</h2>
-    <label class="campo" style="margin-bottom:.5rem">Límite de ${fmtPatente(c.patente)} (horas de motor)
+    <label class="campo" style="margin-bottom:.5rem">Límite de ${etq(c)} (horas de motor)
       <input name="limite" type="number" min="1" required inputmode="numeric" value="${c.limite}"></label>
     <p class="ayuda" style="margin:0 0 .75rem">Avisa al ${cfg.pctAviso} % y al ${cfg.pctUrgente} % del límite. Mantención cada ${n0(cfg.intervaloMant)} h.</p>
     <a href="#ajustes?tab=alertas" onclick="cerrarDlg()">Cambiar las alertas de toda la flota ›</a>
@@ -1369,7 +1422,7 @@ async function guardarLimite(ev, id) {
 function dlgFechaRT(id) {
   const c = camion(id);
   dialogo(`<form onsubmit="guardarFechaRT(event,'${id}')"><h2>Revisión técnica</h2>
-    <label class="campo" style="margin-bottom:0">¿Cuándo vence?<input name="rtVence" type="date" required value="${c.rtVence}"></label>
+    <label class="campo" style="margin-bottom:0">¿Cuándo vence?<input name="rtVence" type="date" value="${c.rtVence}"></label>
     ${botonesDlg('Guardar')}</form>`);
 }
 function guardarFechaRT(ev, id) {
@@ -1473,7 +1526,7 @@ VISTAS.contrato = id => {
   </div>
   <section class="tarjeta">
     <h2>Camiones arrendados (${cs.length})</h2>
-    ${cs.map(c => `<a class="aviso-fila" href="#camion/${c.id}"><span class="chip-ico ${estadoGeneral(c)}">${ic('truck')}</span><span class="cuerpo"><b class="patente" style="font-size:1.05rem">${fmtPatente(c.patente)}</b><span class="sec">${esc(c.tipo)} · ${esc(c.modelo)}</span>
+    ${cs.map(c => `<a class="aviso-fila" href="#camion/${c.id}"><span class="chip-ico ${estadoGeneral(c)}">${ic('truck')}</span><span class="cuerpo"><b class="patente" style="font-size:1.05rem">${etq(c)}</b><span class="sec">${esc(c.tipo)} · ${esc(c.modelo)}</span>
       <span class="chips">${chip(estadoRT(c).e, 'Rev. técnica: ' + estadoRT(c).txt)}${chip(estadoHoras(c).e, 'Horas: ' + estadoHoras(c).txt)}</span></span>${ic('chevron')}</a>`).join('') || '<p class="sec">Sin camiones asignados.</p>'}
   </section>
   ${k.notas ? `<section class="tarjeta"><h2>Notas</h2><p style="margin:0">${esc(k.notas)}</p></section>` : ''}
@@ -1508,7 +1561,7 @@ function fichaHTML(k) {
     ${h2('4. Equipos arrendados')}
     <table style="width:100%;border-collapse:collapse;font-size:10.5pt">
       <tr>${['Patente', 'Tipo', 'Modelo', 'Horómetro actual', 'Rev. técnica vence'].map(t => `<th style="border:1px solid #111;padding:6px 8px;background:#111;color:#fff;text-align:left">${t}</th>`).join('')}</tr>
-      ${cs.map(c => `<tr><td ${td}><b>${fmtPatente(c.patente)}</b></td><td ${td}>${esc(c.tipo)}</td><td ${td}>${esc(c.modelo)}</td><td ${td}>${n1(estadoHoras(c).actual)} h</td><td ${td}>${fecha(dISO(c.rtVence))}</td></tr>`).join('')}
+      ${cs.map(c => `<tr><td ${td}><b>${etq(c)}</b></td><td ${td}>${esc(c.tipo)}</td><td ${td}>${esc(c.modelo)}</td><td ${td}>${n1(estadoHoras(c).actual)} h</td><td ${td}>${fechaRT(c)}</td></tr>`).join('')}
     </table>
     ${h2('5. Observaciones')}
     <p style="margin:0">${esc(k.notas || 'Sin observaciones.')}</p>
@@ -1543,7 +1596,8 @@ VISTAS['editar-contrato'] = (id, q) => {
   <h1>${nuevo ? 'Nuevo contrato de arriendo' : 'Editar contrato'}</h1>
   <form class="tarjeta" onsubmit="guardarContrato(event,'${id}')">
     <fieldset><legend>Empresa que arrienda</legend>
-      ${campo('empresa', 'Nombre de la empresa', k.empresa, 'text', 'required')}
+      ${campo('empresa', 'Nombre de la empresa', k.empresa, 'text', 'required list="lsClientes" autocomplete="off"')}
+      <datalist id="lsClientes">${clientes().map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
       ${campo('rut', 'RUT', k.rut)}
       ${campo('faena', 'Faena o lugar de trabajo', k.faena)}
     </fieldset>
@@ -1558,7 +1612,7 @@ VISTAS['editar-contrato'] = (id, q) => {
       ${campo('adminCorreo', 'Correo', k.admin.correo, 'email')}
     </fieldset>
     <fieldset><legend>Camiones que se arriendan</legend>
-      ${elegibles.length ? elegibles.map(c => `<label class="check"><input type="checkbox" name="camiones" value="${c.id}" ${c.contratoId === id || c.id === pre ? 'checked' : ''}>${fmtPatente(c.patente)} <span class="sec">· ${esc(c.tipo)}</span></label>`).join('') : '<p class="sec">No hay camiones disponibles.</p>'}
+      ${elegibles.length ? elegibles.map(c => `<label class="check"><input type="checkbox" name="camiones" value="${c.id}" ${c.contratoId === id || c.id === pre ? 'checked' : ''}>${etq(c)} <span class="sec">· ${esc(c.tipo)}</span></label>`).join('') : '<p class="sec">No hay camiones disponibles.</p>'}
     </fieldset>
     <label class="campo">Notas<textarea name="notas" rows="3">${esc(k.notas)}</textarea></label>
     <button class="btn pri grande">Guardar contrato</button>
@@ -1601,9 +1655,9 @@ VISTAS.revisiones = () => {
   <div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.8fr) minmax(0,1fr) minmax(0,1.5fr) 24px">
     <div class="lista-cab"><span>Camión</span><span>Arriendo</span><span>Vence</span><span>Estado</span><span></span></div>
     ${cs.map(c => { const rt = estadoRT(c), k = contrato(c.contratoId); return `<a class="lista-fila" href="#camion/${c.id}">
-      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}</span></span>
+      <span class="celda-pri"><b>${etq(c)}</b><span class="sub">${esc(c.tipo)}</span></span>
       <span class="opc">${k ? esc(k.empresa) : '<span class="sec">Disponible</span>'}</span>
-      <span class="opc">${fecha(dISO(c.rtVence))}</span>
+      <span class="opc">${fechaRT(c)}</span>
       <span>${estado(rt.e, rt.txt)}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
   </div>
@@ -1630,17 +1684,17 @@ VISTAS.horometros = () => {
     <div class="lista-cab"><span>Foto</span><span>Camión</span><span>Lectura</span><span>Registró</span><span></span></div>
     ${pend.map(({ c, l, ant }) => `<div class="lista-fila">
       ${l.foto === false ? `<span class="chip-ico ok" aria-hidden="true">${ic('send')}</span>` : `<img class="mini-foto" src="${l.img || fotoEjemplo(l.valor)}" alt="Foto del horómetro: ${n1(l.valor)} h" onclick="verFoto(this.src)" style="cursor:zoom-in">`}
-      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${cuando(l.fecha)}<span class="solo-movil"> · ${n1(l.valor)} h</span></span></span>
+      <span class="celda-pri"><b>${etq(c)}</b><span class="sub">${cuando(l.fecha)}<span class="solo-movil"> · ${n1(l.valor)} h</span></span></span>
       <span class="opc"><b class="num">${n1(l.valor)} h</b><span class="sub">${ant ? `+${n1(l.valor - ant.valor)} h` : 'Primer registro'}</span></span>
       <span class="opc">${esc(l.quien || usuario(l.usuario).nombre)}<span class="sub">${l.origen === 'whatsapp' ? 'vía WhatsApp' : 'vía app'}</span></span>
-      <span class="acciones" style="gap:6px;flex-wrap:nowrap"><button class="btn chico pri" onclick="validar('${c.id}','${l.id}',true)" aria-label="Validar registro de ${fmtPatente(c.patente)}">${ic('check')}<span class="opc-txt">Validar</span></button><button class="btn chico" onclick="validar('${c.id}','${l.id}',false)">Observar</button></span>
+      <span class="acciones" style="gap:6px;flex-wrap:nowrap"><button class="btn chico pri" onclick="validar('${c.id}','${l.id}',true)" aria-label="Validar registro de ${etq(c)}">${ic('check')}<span class="opc-txt">Validar</span></button><button class="btn chico" onclick="validar('${c.id}','${l.id}',false)">Observar</button></span>
     </div>`).join('')}
   </div>` : ''}
   <h2>Todos los camiones</h2>
   <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,1.3fr) minmax(0,1.4fr) minmax(0,1.3fr) 24px">
     <div class="lista-cab"><span>Camión</span><span>Horas</span><span>Uso del límite</span><span>Último registro</span><span></span></div>
     ${cs.map(c => { const h = estadoHoras(c), u = ultima(c), s = sinReporte(c); return `<a class="lista-fila" href="#camion/${c.id}">
-      <span class="celda-pri"><b>${fmtPatente(c.patente)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${n0(h.actual)} de ${n0(c.limite)} h</span></span><span class="sub solo-movil">${estado(estadoMant(c).e, 'Mantención: ' + estadoMant(c).txt.toLowerCase())}</span></span>
+      <span class="celda-pri"><b>${etq(c)}</b><span class="sub">${esc(c.tipo)}<span class="solo-movil"> · ${n0(h.actual)} de ${n0(c.limite)} h</span></span><span class="sub solo-movil">${estado(estadoMant(c).e, 'Mantención: ' + estadoMant(c).txt.toLowerCase())}</span></span>
       <span class="opc num">${n0(h.actual)}<span class="sub">de ${n0(c.limite)} h</span><span class="sub">${estado(estadoMant(c).e, 'Mant.: ' + estadoMant(c).txt.toLowerCase())}</span></span>
       <span>${estado(h.e, h.txt)}<span class="sub opc-sub">${h.pct >= 100 ? 'Límite superado' : h.fechaLim ? 'Llega aprox. el ' + fecha(h.fechaLim) : 'Sin uso reciente'}</span></span>
       <span class="opc">${u ? cuando(u.fecha) : '—'}${s.si ? `<span class="sub">${estado('sinreporte', s.dias + ' días sin reporte')}</span>` : ''}</span>
@@ -1666,7 +1720,7 @@ function mensajeResumen() {
 }
 function mensajeCamion(c) {
   const a = estadoRT(c), h = estadoHoras(c), k = contrato(c.contratoId);
-  return `*${fmtPatente(c.patente)}* · ${c.tipo}${k ? `\n• Arrendado a ${k.empresa} hasta el ${fecha(dISO(k.termino))}` : ''}\n• Revisión técnica: ${a.txt.toLowerCase()} (${fecha(dISO(c.rtVence))})\n• Horómetro: ${n1(h.actual)} de ${n0(c.limite)} h (${Math.floor(h.pct)}%)${h.pct < 100 && h.fechaLim ? `, límite aprox. el ${fecha(h.fechaLim)}` : ''}`;
+  return `*${etq(c)}* · ${c.tipo}${k ? `\n• Arrendado a ${k.empresa} hasta el ${fecha(dISO(k.termino))}` : ''}\n• Revisión técnica: ${a.txt.toLowerCase()} (${fechaRT(c)})\n• Horómetro: ${n1(h.actual)} de ${n0(c.limite)} h (${Math.floor(h.pct)}%)${h.pct < 100 && h.fechaLim ? `, límite aprox. el ${fecha(h.fechaLim)}` : ''}`;
 }
 const hh = h => String(h).padStart(2, '0') + ':00';
 const listaContactos = v => String(v || '').split(/[,;]/).map(x => x.trim()).filter(Boolean);
@@ -1751,7 +1805,7 @@ function copiar() { navigator.clipboard?.writeText(mensajeResumen()).then(() => 
 /* ============ Dueño: Usuarios y accesos ============ */
 function alcance(u) {
   if (u.rol === 'dueno') return 'Todo';
-  if (u.rol === 'empleado') { const cs = S.camiones.filter(c => c.operador === u.id); return cs.length ? cs.map(c => fmtPatente(c.patente)).join(', ') : 'Sin camiones asignados'; }
+  if (u.rol === 'empleado') { const cs = S.camiones.filter(c => c.operador === u.id); return cs.length ? cs.map(c => etq(c)).join(', ') : 'Sin camiones asignados'; }
   const k = contrato(u.contratoId); return k ? `${k.empresa} (${nCam(camionesDe(k).length)})` : 'Sin contrato asignado';
 }
 VISTAS.usuarios = () => {
@@ -1793,7 +1847,7 @@ VISTAS['editar-usuario'] = id => {
     <label class="campo">Teléfono<input name="telefono" type="tel" value="${esc(u.telefono)}"></label>
     <label class="campo">Perfil<select name="rol" onchange="mostrarCamposRol(this.value)">${Object.entries(ROL).map(([k, t]) => `<option value="${k}" ${u.rol === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
     <fieldset data-rol="empleado" ${u.rol === 'empleado' ? '' : 'hidden'}><legend>Camiones a los que registra horómetro</legend>
-      ${S.camiones.map(c => `<label class="check"><input type="checkbox" name="camiones" value="${c.id}" ${c.operador === id ? 'checked' : ''}>${fmtPatente(c.patente)} <span class="sec">· ${c.contratoId ? esc(contrato(c.contratoId).empresa) : 'Disponible'}</span></label>`).join('')}
+      ${S.camiones.map(c => `<label class="check"><input type="checkbox" name="camiones" value="${c.id}" ${c.operador === id ? 'checked' : ''}>${etq(c)} <span class="sec">· ${c.contratoId ? esc(contrato(c.contratoId).empresa) : 'Disponible'}</span></label>`).join('')}
     </fieldset>
     <fieldset data-rol="cliente" ${u.rol === 'cliente' ? '' : 'hidden'}><legend>Empresa (contrato)</legend>
       <label class="campo" style="margin:0">Ve los camiones de este contrato<select name="contratoId"><option value="">— Elegir —</option>${S.contratos.map(k => `<option value="${k.id}" ${u.contratoId === k.id ? 'selected' : ''}>${esc(k.empresa)}</option>`).join('')}</select></label>
@@ -2096,15 +2150,16 @@ VISTAS.editar = id => {
   if (!c) return VISTAS.flota(null, new URLSearchParams());
   const emps = S.usuarios.filter(u => u.rol === 'empleado');
   return `
-  <h1>${nuevo ? 'Agregar camión' : 'Editar ' + fmtPatente(c.patente)}</h1>
+  <h1>${nuevo ? 'Agregar camión' : 'Editar ' + etq(c)}</h1>
   <form class="tarjeta" onsubmit="guardarCamion(event,'${id}')">
-    <label class="campo">Patente<input name="patente" required value="${esc(c.patente)}" autocapitalize="characters" ${REAL && !nuevo ? 'readonly' : ''}></label>
+    <label class="campo">Patente o código<input name="patente" required value="${esc(c.codigo || c.patente)}" autocapitalize="characters" ${REAL && !nuevo ? 'readonly' : ''}></label>
     <label class="campo">Tipo de equipo<input name="tipo" required value="${esc(c.tipo)}" placeholder="Camión tolva, aljibe…"></label>
     <label class="campo">Marca y modelo<input name="modelo" value="${esc(c.modelo)}"></label>
+    <label class="campo">De quién es el equipo<select name="propiedad"><option value="propio" ${c.propiedad !== 'tercero' ? 'selected' : ''}>Propio</option><option value="tercero" ${c.propiedad === 'tercero' ? 'selected' : ''}>De un tercero</option></select></label>
     <label class="campo" hidden>Empleado que registra el horómetro<select name="operador"><option value="">— Nadie —</option>${emps.map(o => `<option value="${o.id}" ${o.id === c.operador ? 'selected' : ''}>${esc(o.nombre)}</option>`).join('')}</select></label>
     <label class="campo">Límite de horas de motor<input name="limite" type="number" min="1" required value="${c.limite}" inputmode="numeric" ${REAL && !nuevo ? 'readonly' : ''}></label>
     ${REAL && !nuevo ? '<p class="ayuda" style="margin-top:-.5rem">La patente y el límite están conectados con WhatsApp y no se cambian aquí.</p>' : ''}
-    <label class="campo">Vencimiento de la revisión técnica<input name="rtVence" type="date" required value="${c.rtVence}"></label>
+    <label class="campo">Vencimiento de la revisión técnica<input name="rtVence" type="date" value="${c.rtVence}"></label>
     ${nuevo ? `<label class="campo">Lectura actual del horómetro<input name="inicial" type="number" min="0.1" step="0.1" required inputmode="decimal"></label>
     <label class="campo">Horómetro de la última mantención <span class="ayuda">(opcional; si no se sabe, se estima)</span><input name="ultMant" type="number" min="0" step="0.1" inputmode="decimal"></label>
     <label class="campo">¿Qué día se leyó? <span class="ayuda">(desde ahí se cuentan las horas para el próximo registro)</span><input name="fechaLectura" type="date" required max="${isoLocal(Date.now())}" value="${isoLocal(Date.now())}"></label>
@@ -2115,9 +2170,10 @@ VISTAS.editar = id => {
 async function guardarCamion(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target));
-  d.patente = d.patente.toUpperCase().replace(/[^A-Z0-9]/g, ''); d.limite = Number(d.limite);
+  const escrito = d.patente.toUpperCase().trim(); d.patente = escrito.replace(/[^A-Z0-9]/g, ''); d.limite = Number(d.limite);
   if (S.camiones.some(c => c.patente === d.patente && c.id !== id)) { toast('Ya existe un camión con esa patente'); return; }
-  const datos = { patente: d.patente, tipo: d.tipo.trim(), modelo: d.modelo.trim(), operador: d.operador, limite: d.limite, rtVence: d.rtVence };
+  const datos = { patente: d.patente, tipo: d.tipo.trim(), modelo: d.modelo.trim(), operador: d.operador, limite: d.limite, rtVence: d.rtVence, propiedad: d.propiedad === 'tercero' ? 'tercero' : 'propio' };
+  if (id === 'nuevo' && /-/.test(escrito)) datos.codigo = escrito.replace(/\s+/g, '');
   if (id === 'nuevo') {
     // lectura de hoy = ahora; de un día anterior = ese día a las 18:00
     const fechaL = d.fechaLectura === isoLocal(Date.now()) ? Date.now() : new Date(d.fechaLectura + 'T18:00').getTime();
@@ -2142,7 +2198,7 @@ async function guardarCamion(ev, id) {
 }
 function quitarCamion(id) {
   const c = camion(id), k = contrato(c.contratoId);
-  dialogo(`<h2>¿Eliminar ${fmtPatente(c.patente)}?</h2>
+  dialogo(`<h2>¿Eliminar ${etq(c)}?</h2>
     <p style="margin:0">Se borra el camión con todos sus registros y documentos. <b>No se puede deshacer.</b></p>
     ${k ? `<p class="sec" style="margin:.5rem 0 0">Hoy está arrendado a ${esc(k.empresa)}.</p>` : ''}
     <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="eliminarCamion('${id}')">Sí, eliminar</button></div>`);
@@ -2170,7 +2226,7 @@ VISTAS.empleado = () => {
   ${mios.length ? mios.map(c => {
     const u = ultima(c, true); const sr = sinReporte(c); const hoyYa = u && diasHasta(u.fecha) === 0; const k = contrato(c.contratoId);
     return `<div class="tarjeta ${hoyYa ? 'borde-ok' : sr.si ? 'borde-porvencer' : ''}">
-      <div class="fila entre"><span class="patente">${fmtPatente(c.patente)}</span>${hoyYa ? chip('ok', 'Hoy listo') : sr.si ? chip('porvencer', `${sr.dias} días sin registrar`) : ''}</div>
+      <div class="fila entre"><span class="patente">${etq(c)}</span>${hoyYa ? chip('ok', 'Hoy listo') : sr.si ? chip('porvencer', `${sr.dias} días sin registrar`) : ''}</div>
       <div class="sec">${esc(c.tipo)}${k ? ' · ' + esc(k.empresa) : ''}</div>
       <p style="margin:.5rem 0">Última lectura: <b class="num">${u ? n1(u.valor) + ' h' : '—'}</b> <span class="sec">(${u ? cuando(u.fecha) : 'sin registros'})</span>
       ${u && u.sync === 'cola' ? '<br><span class="chip sinreporte">' + ic('wifi-off') + 'Guardado, se enviará al volver la señal</span>' : ''}</p>
@@ -2196,11 +2252,11 @@ VISTAS.registrar = id => {
   if (!REG || REG.id !== id) REG = { id, paso: 1, valor: '', foto: null, error: '' };
   const u = ultima(c, true);
   const cab = `<div class="paso">Paso ${REG.paso} de 3</div>
-    <h1>${fmtPatente(c.patente)} <span class="sec" style="font-size:1rem">${esc(c.tipo)}</span></h1>`;
+    <h1>${etq(c)} <span class="sec" style="font-size:1rem">${esc(c.tipo)}</span></h1>`;
   if (REG.done) return `<div class="listo">
       <div class="circulo">${ic('check')}</div>
       <h1>Listo, quedó guardado</h1>
-      <p><b class="num" style="font-size:1.6rem">${n1(REG.valor)} h</b><br>${fmtPatente(c.patente)} · ${hora(Date.now())}</p>
+      <p><b class="num" style="font-size:1.6rem">${n1(REG.valor)} h</b><br>${etq(c)} · ${hora(Date.now())}</p>
       <p class="sec">${REG.offline ? 'Estás sin señal: se enviará solo cuando vuelva la señal. No tienes que hacer nada más.' : 'Ya se envió a la oficina. No tienes que hacer nada más.'}</p>
       <a class="btn pri grande" href="#empleado">Terminar</a></div>`;
   if (REG.paso === 1) return `${cab}
@@ -2368,7 +2424,7 @@ function chatResponder(txt, img) {
     if (mn && cs.length === 1) c = cs[0];
     else return `No entendí de qué camión es 🤔\nEscribe la patente y el número, por ejemplo:\n${cs[0] ? `${cs[0].patente} ${sugerido(cs[0])}` : 'KDLP21 7450'}`;
   }
-  if (!mn) { ctx.cid = c.id; guardar(); return `¿Cuánto marca el horómetro de ${fmtPatente(c.patente)}? Escribe solo el número.`; }
+  if (!mn) { ctx.cid = c.id; guardar(); return `¿Cuánto marca el horómetro de ${etq(c)}? Escribe solo el número.`; }
   const v = leerNumero(mn[0]);
   const err = validarLectura(c, v);
   if (err) { ctx.cid = c.id; guardar(); return `⚠️ ${err}\nEscribe el número de nuevo.`; }
@@ -2378,7 +2434,7 @@ function chatResponder(txt, img) {
   c.lecturas.push(l);
   ch.ctx = foto ? {} : { ultimo: { cid: c.id, lid: l.id } };
   guardar();
-  return `✅ *Registrado*\n${fmtPatente(c.patente)} · ${n1(v)} h\n${u ? `+${n1(v - u.valor)} h desde ${cuando(u.fecha)}.` : 'Primer registro.'}\n${foto ? '📷 Foto guardada como respaldo.' : 'Si puedes, manda una foto del horómetro como respaldo.'}\n¡Gracias, ${primerNombre(usuario(EMP_ID).nombre)}!`;
+  return `✅ *Registrado*\n${etq(c)} · ${n1(v)} h\n${u ? `+${n1(v - u.valor)} h desde ${cuando(u.fecha)}.` : 'Primer registro.'}\n${foto ? '📷 Foto guardada como respaldo.' : 'Si puedes, manda una foto del horómetro como respaldo.'}\n¡Gracias, ${primerNombre(usuario(EMP_ID).nombre)}!`;
 }
 
 /* ============ Cliente (empresa que arrienda) ============ */
@@ -2396,8 +2452,8 @@ VISTAS.cliente = () => {
     <dl class="dl" style="margin:0"><dt>Contrato</dt><dd>${esc(k.numero)}</dd><dt>Vigencia</dt><dd>${fecha(dISO(k.inicio))} al ${fecha(dISO(k.termino))}</dd><dt>Camiones</dt><dd>${cs.length}</dd></dl>
   </section>
   ${cs.map(c => { const rt = estadoRT(c), h = estadoHoras(c), ul = ultima(c); return `<section class="tarjeta">
-    <div class="fila entre"><span class="patente">${fmtPatente(c.patente)}</span><span class="sec">${esc(c.tipo)}</span></div>
-    <dl class="dl" style="margin-top:.5rem"><dt>Rev. técnica</dt><dd>${fecha(dISO(c.rtVence))}</dd><dt>Horómetro</dt><dd>${n1(h.actual)} h <span class="sec">de ${n0(c.limite)} h</span></dd><dt>Último registro</dt><dd>${ul ? cuando(ul.fecha) : '—'}</dd></dl>
+    <div class="fila entre"><span class="patente">${etq(c)}</span><span class="sec">${esc(c.tipo)}</span></div>
+    <dl class="dl" style="margin-top:.5rem"><dt>Rev. técnica</dt><dd>${fechaRT(c)}</dd><dt>Horómetro</dt><dd>${n1(h.actual)} h <span class="sec">de ${n0(c.limite)} h</span></dd><dt>Último registro</dt><dd>${ul ? cuando(ul.fecha) : '—'}</dd></dl>
     <div class="barra ${h.e}"><span style="width:${Math.min(100, h.pct)}%"></span></div>
     <div class="chips">${chip(rt.e, 'Rev. técnica: ' + rt.txt)}${chip(h.e, 'Horas: ' + h.txt)}</div>
   </section>`; }).join('')}
@@ -2414,7 +2470,7 @@ function exportarCSV() {
   const cab = ['Patente', 'Tipo', 'Modelo', 'Estado arriendo', 'Empresa', 'Contrato vence', 'Horómetro actual', 'Límite horas', '% usado', 'Promedio h/día', 'Fecha límite aprox.', 'Vence rev. técnica', 'Días restantes RT', 'Próxima mantención (h)', 'Horas para mantención', 'Último reporte', 'Estado'];
   const filas = S.camiones.slice().sort(ordenUrgencia).map(c => {
     const h = estadoHoras(c), rt = estadoRT(c), u = ultima(c), k = contrato(c.contratoId);
-    return [fmtPatente(c.patente), c.tipo, c.modelo, k ? 'Arrendado' : 'Disponible', k ? k.empresa : '', k ? fecha(dISO(k.termino)) : '', n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fecha(dISO(c.rtVence)), rt.d, estadoMant(c).prox, n0(estadoMant(c).resta), u ? fecha(u.fecha) : '', motivo(c).e === 'ok' ? 'Al día' : `${ETQ[motivo(c).e]}: ${motivo(c).txt}`];
+    return [etq(c), c.tipo, c.modelo, k ? 'Arrendado' : 'Disponible', k ? k.empresa : '', k ? fecha(dISO(k.termino)) : '', n1(h.actual), c.limite, Math.floor(h.pct), n1(h.prom), h.fechaLim ? fecha(h.fechaLim) : '', fechaRT(c), rt.d ?? '', estadoMant(c).prox, n0(estadoMant(c).resta), u ? fecha(u.fecha) : '', motivo(c).e === 'ok' ? 'Al día' : `${ETQ[motivo(c).e]}: ${motivo(c).txt}`];
   });
   const csv = '﻿' + [cab, ...filas].map(f => f.map(x => `"${String(x).replace(/"/g, '""')}"`).join(';')).join('\r\n');
   const a = document.createElement('a');
