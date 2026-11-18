@@ -1,4 +1,5 @@
 -- Control de Flota · v43: clientes, ventas y leasing en tablas propias (una fila cada uno)
+-- (Incluye también lo del v44: la columna lineas. Con este solo script basta.)
 -- Cómo usarlo: Supabase → SQL Editor → pestaña nueva (+) → pega todo esto → Run. Se puede repetir sin problema.
 -- Qué hace: crea las tablas, copia lo que hoy está guardado dentro del registro compartido (estado_app) y,
 -- solo si la copia quedó completa, lo saca de ahí. No borra ningún dato.
@@ -32,8 +33,10 @@ create table if not exists ventas (
   fecha_pago date,
   notas text not null default '',
   origen text not null default 'app',  -- app o excel
+  lineas jsonb,                        -- equipos de la orden: [{id, equipo, neto, tercero, leasing}]
   creado timestamptz not null default now()
 );
+alter table ventas add column if not exists lineas jsonb;   -- por si la tabla ya existía sin esta columna
 create index if not exists ventas_mes on ventas (mes);
 create index if not exists ventas_estado on ventas (estado);
 create table if not exists leasing (
@@ -68,13 +71,13 @@ from estado_app e, jsonb_to_recordset(coalesce(e.datos -> 'clientes', '[]'::json
 where e.id = 1
 on conflict (id) do nothing;
 
-insert into ventas (id, mes, area, cliente, oc, edp, equipos, desde, hasta, neto, proveedor, estado, factura, fecha_factura, fecha_pago, notas, origen)
+insert into ventas (id, mes, area, cliente, oc, edp, equipos, desde, hasta, neto, proveedor, estado, factura, fecha_factura, fecha_pago, notas, origen, lineas)
 select x.id, x.mes, coalesce(x.area, 'rental'), x.cliente, coalesce(x.oc, ''), coalesce(x.edp, ''), coalesce(x.equipos, ''),
        nullif(x.desde, '')::date, nullif(x.hasta, '')::date, coalesce(x.neto, 0), x.proveedor, coalesce(x.estado, 'pendiente'),
-       coalesce(x.factura, ''), nullif(x."fechaFactura", '')::date, nullif(x."fechaPago", '')::date, coalesce(x.notas, ''), coalesce(x.origen, 'app')
+       coalesce(x.factura, ''), nullif(x."fechaFactura", '')::date, nullif(x."fechaPago", '')::date, coalesce(x.notas, ''), coalesce(x.origen, 'app'), x.lineas
 from estado_app e, jsonb_to_recordset(coalesce(e.datos -> 'ventas', '[]'::jsonb))
   as x(id text, mes text, area text, cliente text, oc text, edp text, equipos text, desde text, hasta text, neto numeric, proveedor numeric,
-       estado text, factura text, "fechaFactura" text, "fechaPago" text, notas text, origen text)
+       estado text, factura text, "fechaFactura" text, "fechaPago" text, notas text, origen text, lineas jsonb)
 where e.id = 1
 on conflict (id) do nothing;
 
