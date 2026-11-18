@@ -389,6 +389,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .docs li{display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--borde)}
 .docs li button.doc{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
 .docs li button.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.din{font-size:.8em;white-space:nowrap;display:inline-block}
 .prev-leas{position:sticky;top:-18px;z-index:2;box-shadow:0 6px 8px -6px rgba(0,0,0,.2);background:#F8FAFC;border:1px solid var(--borde);border-radius:12px;padding:12px;margin-top:4px}
 .prev-leas dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:4px 12px}
 .prev-leas dt{color:var(--texto-2)} .prev-leas dd{margin:0;text-align:right;font-weight:700}
@@ -550,7 +551,7 @@ try { S = JSON.parse(localStorage.getItem(CLAVE)); } catch (e) { S = null; }
 if (!S || !S.camiones) S = crearDemo();
 S.rol = 'dueno'; // por ahora solo se muestra la vista del dueño (empleado y cliente quedan escondidos)
 // completa datos guardados con versiones anteriores (también al traer el estado desde Supabase)
-function completarDatos() { S.config = { intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, avisoInmediato: true, resumenFrec: 'nunca', resumenDia: 1, horaAvisos: 9, ...S.config };
+function completarDatos() { S.config = { plazoPagoDias: 30, diasFacturaAviso: 7, diasFacturaUrgente: 2, intervaloMant: 250, horasMantAviso: 25, horasMantUrgente: 10, validarSalto: false, avisoInmediato: true, resumenFrec: 'nunca', resumenDia: 1, horaAvisos: 9, ...S.config };
   // v41: las órdenes de compra duran ~1 mes; si siguen los avisos de contrato (60/15 días), pasan a 7/3 una sola vez
   if (!S.config.ocAvisoV41) { if (S.config.diasContratoAviso === 60 && S.config.diasContratoUrgente === 15) { S.config.diasContratoAviso = 7; S.config.diasContratoUrgente = 3; } S.config.ocAvisoV41 = true; }
 }
@@ -568,7 +569,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '41'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '42'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -805,6 +806,11 @@ function itemsAtencion() {
     if (ec.e !== 'ok') xs.push({ tipo: 'Orden de compra', e: ec.e, titulo: k.empresa, detalle: `OC ${k.numero}: ${ec.txt.toLowerCase()} (${fecha(dISO(k.termino))}) · conviene renovarla`,
       msg: `${k.empresa}: orden de compra ${k.numero} ${ec.txt.toLowerCase()} (${fechaCorta(dISO(k.termino))})`, href: '#contrato/' + k.id });
   });
+  ventas().filter(v => v.estado === 'facturado').forEach(v => {
+    const c = cobro(v);
+    if (c.e !== 'ok' && c.e !== 'sinreporte') xs.push({ tipo: 'Factura', e: c.e, titulo: v.cliente, detalle: `Factura ${v.factura || 's/n'} por ${peso(vTotal(v))}: ${c.txt.toLowerCase()} (vence ${fecha(dISO(c.vence))})`,
+      msg: `${v.cliente}: factura ${v.factura || 's/n'} por ${peso(vTotal(v))}, ${c.txt.toLowerCase()}`, href: '#finanzas?tab=cobrar' });
+  });
   S.camiones.forEach(c => {
     const p = etq(c), rt = estadoRT(c), h = estadoHoras(c), s = sinReporte(c), m = estadoMant(c);
     if (m.e !== 'ok') xs.push({ tipo: 'Mantención', e: m.e, titulo: p, detalle: `Mantención de las ${n0(m.prox)} h: ${m.txt.toLowerCase()}${m.fechaProx ? ' · aprox. el ' + fecha(m.fechaProx) : ''}`,
@@ -842,7 +848,7 @@ addEventListener('offline', () => { pintarRed(); render(); });
 const MODULOS = [
   ['', [['inicio', 'home', 'Inicio'], ['avisos', 'bell', 'Avisos']]],
   ['MANTENIMIENTO', [['flota', 'truck', 'Flota'], ['horometros', 'gauge', 'Horómetros'], ['revisiones', 'shield', 'Revisiones técnicas']]],
-  ['ADMINISTRACIÓN Y FINANZAS', [['clientes', 'building', 'Clientes'], ['contratos', 'file', 'Órdenes de compra'], ['finanzas', 'dollar', 'Facturas y pagos'], ['leasing', 'calc', 'Leasing']]],
+  ['ADMINISTRACIÓN Y FINANZAS', [['clientes', 'building', 'Clientes'], ['contratos', 'file', 'Órdenes de compra'], ['finanzas', 'dollar', 'Ventas y caja'], ['leasing', 'calc', 'Leasing']]],
 ]; // 'Usuarios y accesos' (perfiles de la demo) queda escondido
 if (REAL) MODULOS[2][1].push(['usuarios', 'users', 'Usuarios']); // con Supabase: cuentas reales para entrar a la app
 const MENU = MODULOS.flatMap(m => m[1]);
@@ -930,22 +936,354 @@ VISTAS.mas = () => {
   <div class="menu-grilla">
     ${acceso('clientes', 'building', 'Clientes', '#2563EB')}
     ${acceso('contratos', 'file', 'Órdenes de compra', '#2563EB')}
-    ${acceso('finanzas', 'dollar', 'Facturas y pagos', '#2563EB')}
+    ${acceso('finanzas', 'dollar', 'Ventas y caja', '#2563EB')}
     ${acceso('leasing', 'calc', 'Leasing', '#2563EB')}
     ${REAL ? acceso('usuarios', 'users', 'Usuarios', '#7C3AED') : ''}
   </div>
   ${REAL ? '<button class="btn" style="width:100%;background:#E4E6EB;border-color:#E4E6EB" onclick="salir()">Cerrar sesión</button>' : ''}`;
 };
-/* === Facturas y pagos (módulo Administración y finanzas) — en espera del Excel del cliente === */
-VISTAS.finanzas = () => `
-  <h1>Facturas y pagos</h1>
+/* === Ventas y caja (v42): arriendos del mes, facturas, cobranza, margen y caja. Reemplaza al Excel; también importa y exporta Excel === */
+const ventas = () => S.ventas || (S.ventas = []);
+const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const nombreMes = ym => MESES[+ym.slice(5, 7) - 1] + ' ' + ym.slice(0, 4);
+const ymHoy = () => isoLocal(Date.now()).slice(0, 7);
+const sumar = (xs, f) => xs.reduce((t, x) => t + f(x), 0);
+// Montos: se guarda el neto; IVA 19 % y total se calculan. Margen = neto - valor del proveedor (equipos de terceros).
+const vNeto = v => Number(v.neto) || 0, vCosto = v => Number(v.proveedor) || 0;
+const vTotal = v => Math.round(vNeto(v) * 1.19), vMargen = v => vNeto(v) - vCosto(v);
+const clienteDe = v => clientes().find(c => normNombre(c.nombre) === normNombre(v.cliente));
+const plazoDe = v => { const c = clienteDe(v); return Number(c && c.plazoPago) || S.config.plazoPagoDias || 30; };
+const sumaDias = (iso, n) => isoLocal(new Date(dISO(iso)).getTime() + n * DIA);
+const venceVenta = v => v.fechaFactura ? sumaDias(v.fechaFactura, plazoDe(v)) : null;
+// Cobranza de una factura emitida y no pagada: vence = fecha de factura + plazo de pago del cliente
+function cobro(v) {
+  const f = venceVenta(v); if (!f) return { e: 'sinreporte', d: null, txt: 'Sin fecha de factura', vence: null };
+  const d = diasHasta(dISO(f)), cfg = S.config;
+  let e = 'ok', txt = d === 0 ? 'Vence hoy' : d === 1 ? 'Vence mañana' : `Vence en ${d} días`;
+  if (d < 0) { e = 'vencido'; txt = `Atrasada ${-d} ${-d === 1 ? 'día' : 'días'}`; }
+  else if (d <= (cfg.diasFacturaUrgente ?? 2)) e = 'urgente';
+  else if (d <= (cfg.diasFacturaAviso ?? 7)) e = 'porvencer';
+  return { e, d, txt, vence: f };
+}
+function chipVenta(v) {
+  if (v.estado === 'pagado') return estado('ok', 'Pagada');
+  if (v.estado === 'facturado') { const c = cobro(v); return c.e === 'ok' ? estado('sinreporte', 'Por cobrar') : estado(c.e, c.txt); }
+  return v.estado === 'en revision' ? estado('porvencer', 'En revisión') : estado('sinreporte', 'Por facturar');
+}
+const esTercero = v => vCosto(v) > 0;
+const kpiM = (cls, n, t, i) => kpi(cls, `<span class="din">${n}</span>`, t, i); // montos: letra algo más chica para que quepan en el celular
+// Cuota de leasing que corresponde a un mes (si el leasing tiene fecha de primera cuota, solo mientras dura)
+function cuotaLeasingMes(ym) {
+  return sumar(leasings(), l => {
+    const r = calcLeasing(l); if (!r) return 0;
+    if (l.inicio && r.termina) { const fin = isoLocal(r.termina.getTime()).slice(0, 7); if (ym < l.inicio.slice(0, 7) || ym >= fin) return 0; }
+    return r.cuota;
+  });
+}
+const mesesConDatos = () => [...new Set(ventas().map(v => v.mes))].sort();
+
+VISTAS.finanzas = (_, q) => {
+  const tab = ['caja', 'cobrar', 'mes', 'resumen'].includes(q.get('tab')) ? q.get('tab') : 'caja';
+  const ms = mesesConDatos(), mes = q.get('mes') || ms[ms.length - 1] || ymHoy();
+  const anio = q.get('anio') || mes.slice(0, 4);
+  const pest = (k, t) => `<a class="btn chico" href="#finanzas?tab=${k}&mes=${mes}" aria-pressed="${tab === k}">${t}</a>`;
+  const cuerpo = tab === 'caja' ? vistaCaja(anio) : tab === 'cobrar' ? vistaCobrar() : tab === 'mes' ? vistaMes(mes, ms) : vistaResumen(anio);
+  return `
+  <div class="cab"><div><h1>Ventas y caja</h1><p class="sec" style="margin:0">Cuánto se vende, cuánto se cobra y cuánto queda.</p></div>
+    <button class="btn chico cta no-print" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Nuevo arriendo</button></div>
+  <nav class="filtros no-print" aria-label="Secciones">${pest('caja', 'Caja')}${pest('cobrar', 'Por cobrar')}${pest('mes', 'Mes')}${pest('resumen', 'Resumen del año')}</nav>
+  ${cuerpo}
+  <div class="acciones no-print" style="margin:4px 0 16px"><button class="btn chico" onclick="dlgImportar()">${ic('download')}Importar Excel</button><button class="btn chico" onclick="exportarVentas()">${ic('download')}Exportar a Excel</button></div>`;
+};
+
+function vistaCaja(anio) {
+  const vs = ventas().filter(v => v.mes.startsWith(anio));
+  const ms = [...new Set([...vs.map(v => v.mes)])].sort();
+  const ventasN = sumar(vs, vNeto), costo = sumar(vs, vCosto), leas = sumar(ms, cuotaLeasingMes), queda = ventasN - costo - leas;
+  const fact = ventas().filter(v => v.estado === 'facturado');
+  const porCobrar = sumar(fact, vTotal), vencido = sumar(fact.filter(v => cobro(v).d != null && cobro(v).d < 0), vTotal);
+  const cobrado = sumar(vs.filter(v => v.estado === 'pagado'), vTotal);
+  const ter = vs.filter(esTercero), pro = vs.filter(v => !esTercero(v));
+  const bloque = (t, xs) => `<div class="fila entre" style="padding:.35rem 0;border-top:1px solid var(--borde)"><span>${t}<span class="sec" style="display:block;font-size:.85rem">${xs.length} ${xs.length === 1 ? 'arriendo' : 'arriendos'} · venta ${peso(sumar(xs, vNeto))}</span></span><b class="num">${peso(sumar(xs, vMargen))}</b></div>`;
+  if (!vs.length) return `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay ventas de ${anio}. Agrega un arriendo o importa tu Excel.</p></div>`;
+  return `
+  <div class="kpis k3">
+    ${kpiM('', pesoCorto(ventasN), 'Ventas netas', 'dollar')}
+    ${kpiM('', pesoCorto(costo + leas), 'Costos', 'truck')}
+    ${kpiM(queda < 0 ? 'urgente' : 'ok', pesoCorto(queda), 'Queda', 'check')}
+  </div>
   <section class="tarjeta">
-    <h2>En preparación</h2>
-    <p class="sec">Aquí irán las facturas de cada orden de compra y si están pagadas o atrasadas. Se arma con el Excel que manda el cliente.</p>
+    <h2>Cobranza</h2>
+    <div class="fila entre" style="padding:.35rem 0"><span>Ya cobrado <span class="sec">(con IVA)</span></span><b class="num">${peso(cobrado)}</b></div>
+    <div class="fila entre" style="padding:.35rem 0;border-top:1px solid var(--borde)"><span>Por cobrar</span><b class="num">${peso(porCobrar)}</b></div>
+    <div class="fila entre" style="padding:.35rem 0;border-top:1px solid var(--borde)"><span>De eso, atrasado</span><b class="num" style="${vencido ? 'color:var(--ur-t)' : ''}">${peso(vencido)}</b></div>
+    <a href="#finanzas?tab=cobrar" style="display:inline-block;margin-top:.5rem">Ver facturas por cobrar ›</a>
   </section>
-  <a class="tarjeta fila" style="text-decoration:none;color:inherit;justify-content:space-between" href="#contratos">
-    <span><b>Órdenes de compra</b><span class="sec" style="display:block">${S.contratos.length} ${S.contratos.length === 1 ? 'orden' : 'órdenes'}</span></span>${ic('chevron')}</a>`;
-/* === fin Facturas y pagos === */
+  <section class="tarjeta">
+    <h2>Margen de ${anio}</h2>
+    ${bloque('Equipos de terceros', ter)}${bloque('Equipos propios', pro)}
+    <p class="ayuda" style="margin:.5rem 0 0">Margen = venta neta menos el valor del proveedor.</p>
+  </section>
+  <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)">
+    <div class="lista-cab"><span>Mes</span><span>Ventas</span><span>Proveedores</span><span>Leasing</span><span>Queda</span></div>
+    ${ms.map(m => { const x = ventas().filter(v => v.mes === m), a = sumar(x, vNeto), c = sumar(x, vCosto), l = cuotaLeasingMes(m), r = a - c - l; return `<a class="lista-fila" href="#finanzas?tab=mes&mes=${m}">
+      <span class="celda-pri"><b>${MESES[+m.slice(5, 7) - 1]}</b><span class="sub solo-movil">Ventas ${pesoCorto(a)} · Costos ${pesoCorto(c + l)}</span></span>
+      <span class="opc num">${peso(a)}</span><span class="opc num">${peso(c)}</span><span class="opc num">${peso(l)}</span>
+      <b class="num" style="${r < 0 ? 'color:var(--ur-t)' : ''}">${pesoCorto(r)}</b></a>`; }).join('')}
+  </div>
+  <p class="ayuda">Valores netos, sin IVA. Costos = valor de proveedores + cuotas de leasing. No incluye otros gastos (sueldos, combustible, etc.).${ms.some(m => sumar(ventas().filter(v => v.mes === m), vCosto) === 0) && costo > 0 ? ' El Excel trae el valor del proveedor solo desde octubre: los meses sin costo muestran el margen completo.' : ''}</p>`;
+}
+
+function vistaCobrar() {
+  const fact = ventas().filter(v => v.estado === 'facturado').map(v => ({ v, c: cobro(v) }))
+    .sort((a, b) => (a.c.vence || '9999').localeCompare(b.c.vence || '9999'));
+  const venc = fact.filter(x => x.c.d != null && x.c.d < 0);
+  const vence7 = fact.filter(x => x.c.d != null && x.c.d >= 0 && x.c.d <= (S.config.diasFacturaAviso ?? 7));
+  return `
+  <div class="kpis k3">
+    ${kpi('', fact.length, 'Facturas', 'file')}
+    ${kpiM('', pesoCorto(sumar(fact, x => vTotal(x.v))), 'Por cobrar', 'dollar')}
+    ${kpiM(venc.length ? 'urgente' : '', pesoCorto(sumar(venc, x => vTotal(x.v))), 'Atrasado', 'alert')}
+  </div>
+  ${fact.length ? `<div class="lista" style="--cols:minmax(0,1.6fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1.3fr) 24px">
+    <div class="lista-cab"><span>Cliente</span><span>Factura</span><span>Total</span><span>Estado</span><span></span></div>
+    ${fact.map(({ v, c }) => `<a class="lista-fila" href="#finanzas?tab=cobrar" role="button" onclick="dlgPago('${v.id}');return false">
+      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">Factura ${esc(v.factura || 's/n')} · ${peso(vTotal(v))}<span class="solo-movil">${c.vence ? ' · vence ' + fecha(dISO(c.vence)) : ''}</span></span></span>
+      <span class="opc">${esc(v.factura || 's/n')}<span class="sub">${v.fechaFactura ? 'del ' + fecha(dISO(v.fechaFactura)) : ''}</span></span>
+      <span class="opc num">${peso(vTotal(v))}</span>
+      <span>${estado(c.e === 'ok' ? 'sinreporte' : c.e, c.txt)}<span class="sub opc-sub">${c.vence ? 'vence ' + fecha(dISO(c.vence)) : ''}</span></span>
+      <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
+  </div>
+  <p class="ayuda">Toca una factura para registrar el pago. Vence = fecha de factura + plazo de pago del cliente (${S.config.plazoPagoDias || 30} días si no tiene uno propio).${vence7.length ? ` ${vence7.length} vence${vence7.length === 1 ? '' : 'n'} en los próximos ${S.config.diasFacturaAviso ?? 7} días.` : ''}</p>`
+  : '<div class="tarjeta vacio">No hay facturas por cobrar. 🎉</div>'}`;
+}
+
+function vistaMes(mes, ms) {
+  const lista = [...new Set([...ms, mes])].sort();
+  const vs = ventas().filter(v => v.mes === mes).sort((a, b) => a.cliente.localeCompare(b.cliente, 'es'));
+  const neto = sumar(vs, vNeto), fact = sumar(vs.filter(v => v.estado === 'facturado' || v.estado === 'pagado'), vNeto);
+  return `
+  <section class="tarjeta nota" style="margin-bottom:12px"><p class="sec" style="margin:0"><b>Por aclarar con el cliente:</b> qué significa el N° EDP. Mientras tanto se guarda tal como viene en el Excel.</p></section>
+  <label class="campo" style="margin-bottom:12px">Mes<select onchange="location.hash='finanzas?tab=mes&mes='+this.value">${lista.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nombreMes(m)}</option>`).join('')}</select></label>
+  <div class="kpis k3">
+    ${kpiM('', pesoCorto(neto), 'Venta neta', 'dollar')}
+    ${kpi('', neto ? Math.round(fact / neto * 100) + ' %' : '—', 'Facturado', 'file')}
+    ${kpiM('', pesoCorto(neto - fact), 'Por facturar', 'clock')}
+  </div>
+  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.6fr) minmax(0,1.4fr) minmax(0,1fr) minmax(0,1.2fr) 24px">
+    <div class="lista-cab"><span>Cliente</span><span>Equipos</span><span>Neto</span><span>Estado</span><span></span></div>
+    ${vs.map(v => `<a class="lista-fila" href="#finanzas?tab=mes" role="button" onclick="dlgVenta('${v.id}');return false">
+      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${esc(v.equipos || 'Sin equipo')}${v.proveedor ? ' · tercero' : ''}</span></span>
+      <span class="opc">${esc(v.equipos || '—')}</span>
+      <span class="opc num">${peso(vNeto(v))}</span>
+      <span class="num-estado" style="text-align:right"><b class="num solo-movil-bloque">${pesoCorto(vNeto(v))}</b>${chipVenta(v)}</span>
+      <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
+  </div>
+  <p class="ayuda">Total del mes: neto ${peso(neto)} · IVA ${peso(Math.round(neto * 0.19))} · con IVA ${peso(sumar(vs, vTotal))} · margen ${peso(sumar(vs, vMargen))}</p>`
+  : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">No hay arriendos en ${nombreMes(mes)}.</p><button class="btn cta" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Agregar el primero</button></div>`}`;
+}
+
+function vistaResumen(anio) {
+  const ms = mesesConDatos().filter(m => m.startsWith(anio));
+  if (!ms.length) return '<div class="tarjeta vacio">Todavía no hay ventas para resumir.</div>';
+  const fila = m => { const x = ventas().filter(v => v.mes === m), a = sumar(x, vNeto), f = sumar(x.filter(v => v.estado === 'facturado' || v.estado === 'pagado'), vNeto);
+    return { m, n: x.length, a, pct: a ? Math.round(f / a * 100) : 0, falta: a - f, mar: sumar(x, vMargen) }; };
+  const fs = ms.map(fila), T = { a: sumar(fs, x => x.a), falta: sumar(fs, x => x.falta), mar: sumar(fs, x => x.mar), n: sumar(fs, x => x.n) };
+  return `
+  <div class="kpis k3">
+    ${kpiM('', pesoCorto(T.a), 'Ventas del año', 'dollar')}
+    ${kpi('', T.a ? Math.round((T.a - T.falta) / T.a * 100) + ' %' : '—', 'Facturado', 'file')}
+    ${kpiM('ok', pesoCorto(T.mar), 'Margen', 'check')}
+  </div>
+  <div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,.7fr) minmax(0,1.2fr) minmax(0,.9fr) minmax(0,1.2fr) minmax(0,1.2fr)">
+    <div class="lista-cab"><span>Mes</span><span>Arriendos</span><span>Ventas netas</span><span>% facturado</span><span>Por facturar</span><span>Margen</span></div>
+    ${fs.map(x => `<a class="lista-fila" href="#finanzas?tab=mes&mes=${x.m}">
+      <span class="celda-pri"><b>${MESES[+x.m.slice(5, 7) - 1]}</b><span class="sub solo-movil">${x.n} arriendos · ${x.pct} % facturado</span></span>
+      <span class="opc">${x.n}</span><span class="opc num">${peso(x.a)}</span><span class="opc">${x.pct} %</span><span class="opc num">${peso(x.falta)}</span>
+      <span class="opc num">${peso(x.mar)}</span><b class="num solo-movil-bloque">${pesoCorto(x.a)}</b></a>`).join('')}
+    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total ${anio}</span><span class="opc">${T.n}</span><span class="opc num">${peso(T.a)}</span><span class="opc">${T.a ? Math.round((T.a - T.falta) / T.a * 100) : 0} %</span><span class="opc num">${peso(T.falta)}</span><span class="opc num">${peso(T.mar)}</span><span class="solo-movil-bloque num">${pesoCorto(T.a)}</span></div>
+  </div>
+  <p class="ayuda">Ventas netas, sin IVA. El margen de cada mes está en la pestaña Caja.</p>`;
+}
+
+/* ---- Agregar / editar un arriendo ---- */
+function dlgVenta(id, mesPre) {
+  const nuevo = id === 'nuevo';
+  const v = nuevo ? { mes: mesPre || ymHoy(), area: 'rental', cliente: '', oc: '', edp: '', equipos: '', desde: '', hasta: '', neto: '', proveedor: '', estado: 'pendiente', factura: '', fechaFactura: '', fechaPago: '', notas: '' } : ventas().find(x => x.id === id);
+  if (!v) return;
+  const t = (n, txt, tipo = 'text', extra = '') => `<label class="campo" style="margin-bottom:10px">${txt}<input name="${n}" type="${tipo}" value="${esc(v[n] ?? '')}" ${extra}></label>`;
+  const d = dialogo(`<form onsubmit="guardarVenta(event,'${id}')"><h2>${nuevo ? 'Nuevo arriendo' : 'Editar arriendo'}</h2>
+    <div class="prev-leas" id="prevVenta" aria-live="polite"></div>
+    <label class="campo" style="margin:12px 0 10px">Cliente<input name="cliente" required list="lsClientes2" autocomplete="off" value="${esc(v.cliente)}"></label>
+    <datalist id="lsClientes2">${clientes().map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
+    ${t('mes', 'Mes en que se factura', 'month', 'required')}
+    ${t('equipos', 'Equipos', 'text', 'placeholder="Ej.: Grúa horquilla 16 ton (GHO-007)"')}
+    <div class="grid grid-2">${t('desde', 'Desde', 'date')}${t('hasta', 'Hasta', 'date')}</div>
+    ${t('neto', 'Monto neto ($)', 'number', 'required min="0" step="any" inputmode="decimal"')}
+    ${t('proveedor', 'Valor del proveedor ($) <span class="ayuda">(solo si el equipo es de un tercero)</span>', 'number', 'min="0" step="any" inputmode="decimal"')}
+    <label class="campo" style="margin-bottom:10px">Estado<select name="estado"><option value="pendiente">Por facturar</option><option value="en revision">En revisión</option><option value="facturado">Facturada</option><option value="pagado">Pagada</option></select></label>
+    <div class="grid grid-2">${t('factura', 'N° de factura')}${t('fechaFactura', 'Fecha de factura', 'date')}</div>
+    ${t('fechaPago', 'Fecha de pago <span class="ayuda">(cuando paguen)</span>', 'date')}
+    ${t('oc', 'N° de orden de compra <span class="ayuda">(opcional)</span>')}
+    ${t('edp', 'N° EDP <span class="ayuda">(por aclarar con el cliente qué significa)</span>')}
+    <label class="campo" style="margin-bottom:0">Notas<textarea name="notas" rows="2">${esc(v.notas)}</textarea></label>
+    <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
+    ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarVenta('${id}')">Eliminar arriendo</button>`}</form>`);
+  d.classList.add('ancho');
+  const f = d.querySelector('form'); f.estado.value = v.estado;
+  f.addEventListener('input', () => prevVenta(f)); prevVenta(f);
+}
+function prevVenta(f) {
+  const d = Object.fromEntries(new FormData(f)), neto = Number(d.neto) || 0, prov = Number(d.proveedor) || 0;
+  const v = { neto, proveedor: prov, fechaFactura: d.fechaFactura, cliente: d.cliente };
+  const vence = venceVenta(v);
+  $('#prevVenta').innerHTML = `<dl><dt>IVA 19 %</dt><dd>${peso(Math.round(neto * 0.19))}</dd><dt>Total con IVA</dt><dd class="grande">${peso(vTotal(v))}</dd>
+    <dt>Margen</dt><dd>${peso(neto - prov)}</dd>${vence ? `<dt>Vence el pago</dt><dd>${fecha(dISO(vence))} <span class="sec">(${plazoDe(v)} días)</span></dd>` : ''}</dl>`;
+}
+function guardarVenta(ev, id) {
+  ev.preventDefault();
+  const d = Object.fromEntries(new FormData(ev.target)), neto = Number(d.neto);
+  if (!(neto >= 0) || d.neto === '') { toast('Escribe el monto neto.'); return; }
+  if (d.desde && d.hasta && d.hasta < d.desde) { toast('La fecha "hasta" debe ser posterior a "desde".'); return; }
+  const dato = { mes: d.mes, area: 'rental', cliente: d.cliente.trim(), oc: d.oc.trim(), edp: d.edp.trim(), equipos: d.equipos.trim(), desde: d.desde, hasta: d.hasta, neto,
+    proveedor: d.proveedor === '' ? null : Number(d.proveedor), estado: d.estado, factura: d.factura.trim(), fechaFactura: d.fechaFactura, fechaPago: d.fechaPago, notas: d.notas.trim() };
+  if (dato.fechaPago) dato.estado = 'pagado';
+  else if (dato.fechaFactura && (dato.estado === 'pendiente' || dato.estado === 'en revision')) dato.estado = 'facturado';
+  if (dato.estado === 'facturado' && !dato.fechaFactura) dato.fechaFactura = isoLocal(Date.now());
+  if (!clienteDe(dato)) clientes().push({ id: 'cl' + Date.now(), nombre: dato.cliente, contacto: '', telefono: '', correo: '' });
+  if (id === 'nuevo') ventas().push({ id: 'v' + Date.now(), origen: 'app', ...dato }); else Object.assign(ventas().find(x => x.id === id), dato);
+  guardar(); cerrarDlg(); toast('Arriendo guardado'); render();
+}
+function quitarVenta(id) {
+  const v = ventas().find(x => x.id === id); if (!v) return;
+  window._borrarVenta = () => { S.ventas = ventas().filter(x => x.id !== id); guardar(); cerrarDlg(); toast('Arriendo eliminado'); render(); };
+  cerrarDlg();
+  dialogo(`<h2>¿Eliminar este arriendo?</h2><p style="margin:0">${esc(v.cliente)} · ${peso(vNeto(v))}<br><b>No se puede deshacer.</b></p>
+    <div class="acciones" style="margin-top:1rem"><button class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn peligro-lleno" style="flex:1" onclick="_borrarVenta()">Sí, eliminar</button></div>`);
+}
+// Registrar el pago de una factura
+function dlgPago(id) {
+  const v = ventas().find(x => x.id === id); if (!v) return; const c = cobro(v);
+  dialogo(`<form onsubmit="guardarPago(event,'${id}')"><h2>Registrar pago</h2>
+    <p style="margin:0 0 .5rem"><b>${esc(v.cliente)}</b><br><span class="sec">Factura ${esc(v.factura || 's/n')} · ${peso(vTotal(v))} con IVA${c.vence ? ' · vence ' + fecha(dISO(c.vence)) : ''}</span></p>
+    <label class="campo" style="margin-bottom:0">¿Qué día pagaron?<input name="fechaPago" type="date" required max="${isoLocal(Date.now())}" value="${isoLocal(Date.now())}"></label>
+    <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Marcar pagada</button></div>
+    <button type="button" class="btn" style="width:100%;margin-top:8px" onclick="cerrarDlg();dlgVenta('${id}')">Editar la factura</button></form>`);
+}
+function guardarPago(ev, id) {
+  ev.preventDefault();
+  const v = ventas().find(x => x.id === id); v.fechaPago = ev.target.fechaPago.value; v.estado = 'pagado';
+  guardar(); cerrarDlg(); toast('Pago registrado'); render();
+}
+
+/* ---- Importar y exportar Excel (la hoja se lee en el navegador: no se sube a ningún servidor) ---- */
+const SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+function cargarXLSX() {
+  if (window.XLSX) return Promise.resolve();
+  return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = SHEETJS; s.onload = ok; s.onerror = () => mal(new Error('Se necesita internet para leer el Excel.')); document.head.appendChild(s); });
+}
+const normTxt = t => String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');
+const dos = n => String(n).padStart(2, '0');
+function isoCelda(x) {
+  if (x == null || x === '') return '';
+  if (typeof x === 'number') return new Date(Math.round((x - 25569) * 86400000)).toISOString().slice(0, 10);
+  const s = String(x).trim(), a = s.match(/^(\d{4})-(\d{2})-(\d{2})/), b = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  return a ? a[0] : b ? `${b[3].length === 2 ? '20' + b[3] : b[3]}-${dos(b[2])}-${dos(b[1])}` : '';
+}
+const textoCelda = x => typeof x === 'number' ? String(Math.round(x * 100) / 100).replace(/\.0+$/, '') : String(x ?? '').trim();
+// Lee las hojas Enero…Diciembre: secciones RENTAL / SERVICIOS, cada una con su fila de títulos (Cliente, N° EDP, EQUIPO…)
+function leerLibro(wb, anio) {
+  const out = [], mesesLower = MESES.map(normTxt);
+  wb.SheetNames.forEach(nombre => {
+    const mi = mesesLower.indexOf(normTxt(nombre)); if (mi < 0) return;
+    const mes = `${anio}-${dos(mi + 1)}`, hoja = wb.Sheets[nombre], rango = XLSX.utils.decode_range(hoja['!ref'] || 'A1');
+    rango.s.c = 0; rango.s.r = 0; // siempre desde la columna A: según la hoja, el rango usado parte en A o en B
+    const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: null, range: rango });
+    const esSeccion = i => { const t = normTxt((filas[i] || [])[1]); return (t === 'rental' || t === 'servicios' || t === 'servicio') && filas[i + 1] && normTxt(filas[i + 1][1]) === 'cliente'; };
+    for (let i = 0; i < filas.length; i++) {
+      if (!esSeccion(i)) continue;
+      const area = normTxt(filas[i][1]) === 'rental' ? 'rental' : 'servicio', cab = filas[i + 1].map(normTxt), col = f => cab.findIndex(f);
+      const C = { cliente: col(x => x === 'cliente'), edp: col(x => x.includes('edp')), equipo: col(x => x === 'equipo'), desde: col(x => x.includes('inicio')), hasta: col(x => x.includes('termino')),
+        neto: col(x => x.startsWith('montoneto')), estado: col(x => x === 'estado'), factura: col(x => x.includes('factura') && !x.includes('fecha')), fechaFac: col(x => x.includes('fecha') && x.includes('factura')),
+        obs: col(x => x.startsWith('observ')), prov: col(x => x.includes('proveedor')) };
+      if (C.cliente < 0 || C.neto < 0) continue;
+      let j = i + 2;
+      for (; j < filas.length; j++) {
+        const r = filas[j];
+        if (r.some((x, k) => k > 1 && typeof x === 'string' && /^total/i.test(x.trim())) || esSeccion(j)) break;
+        const cliente = textoCelda(r[C.cliente]).replace(/\s+/g, ' '), neto = r[C.neto];
+        if (!cliente || typeof neto !== 'number') continue;
+        const e = normTxt(r[C.estado]), obs = textoCelda(r[C.obs]);
+        const v = { mes, area, cliente, oc: '', edp: C.edp >= 0 ? textoCelda(r[C.edp]) : '', equipos: textoCelda(r[C.equipo]), desde: isoCelda(r[C.desde]), hasta: isoCelda(r[C.hasta]), neto: Math.round(neto),
+          proveedor: C.prov >= 0 && typeof r[C.prov] === 'number' && r[C.prov] > 0 ? Math.round(r[C.prov]) : null,
+          estado: e === 'pagado' ? 'pagado' : e === 'facturado' ? 'facturado' : e.startsWith('enrevision') ? 'en revision' : 'pendiente',
+          factura: C.factura >= 0 ? textoCelda(r[C.factura]) : '', fechaFactura: C.fechaFac >= 0 ? isoCelda(r[C.fechaFac]) : '', fechaPago: '', notas: obs, origen: 'excel' };
+        // Observaciones tipo "8 de mayo pagan atrasada" traen la fecha de pago
+        const m = obs.toLowerCase().match(/(\d{1,2}) de (enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)[^.]*pag/);
+        if (m && v.estado === 'facturado') { v.fechaPago = `${anio}-${dos(mesesLower.indexOf(m[2]) + 1)}-${dos(m[1])}`; v.estado = 'pagado'; }
+        out.push(v);
+      }
+      i = j - 1;
+    }
+  });
+  return out;
+}
+const claveVenta = v => [v.mes, v.area, normNombre(v.cliente), normNombre(v.equipos), v.desde, v.hasta, Math.round(v.neto)].join('|');
+function dlgImportar() {
+  window._imp = null;
+  dialogo(`<form onsubmit="aplicarImportacion(event)"><h2>Importar desde Excel</h2>
+    <p class="sec" style="margin:0 0 .75rem">Lee las hojas Enero a Diciembre (Rental y Servicios). Lo que ya está en la app no se duplica. El archivo se lee en tu equipo y no se sube a ningún lado.</p>
+    <label class="campo" style="margin-bottom:10px">Archivo Excel<input type="file" accept=".xlsx,.xlsm,.xls" onchange="leerExcel(this)"></label>
+    <label class="campo" style="margin-bottom:10px">Año de las hojas<input name="anio" type="number" min="2000" max="2100" value="${new Date().getFullYear()}" onchange="leerExcel(this.form.querySelector('input[type=file]'))"></label>
+    <div id="impResumen" class="prev-leas"><span class="sec">Elige el archivo para ver qué se va a importar.</span></div>
+    <div id="impOpc"></div>
+    <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" id="impBtn" style="flex:1" disabled>Importar</button></div></form>`).classList.add('ancho');
+}
+async function leerExcel(inp) {
+  const f = inp.files[0], box = $('#impResumen'); if (!f) return;
+  box.innerHTML = '<span class="sec">Leyendo…</span>'; $('#impBtn').disabled = true;
+  try {
+    await cargarXLSX();
+    const form = inp.form, m = f.name.match(/20\d\d/); if (m && !window._imp) form.anio.value = m[0];
+    const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
+    const filas = leerLibro(wb, form.anio.value);
+    if (!filas.length) { box.innerHTML = '<span class="sec">No encontré hojas con meses (Enero, Febrero…) y la tabla Cliente / EQUIPO / MONTO NETO.</span>'; return; }
+    const nuevas = [], yaConteo = {}, usados = {};
+    ventas().forEach(v => { const k = claveVenta(v); yaConteo[k] = (yaConteo[k] || 0) + 1; }); // si el Excel repite una fila, se cuentan las repeticiones
+    filas.forEach(v => { const k = claveVenta(v); usados[k] = (usados[k] || 0) + 1; if (usados[k] <= (yaConteo[k] || 0)) v._ya = true; else nuevas.push(v); });
+    const mesesN = [...new Set(filas.map(v => v.mes))].sort(), cNuevos = [...new Set(nuevas.map(v => v.cliente).filter(n => !clientes().some(c => normNombre(c.nombre) === normNombre(n))))];
+    window._imp = { nuevas, mesesN, cNuevos };
+    const ultFact = [...mesesN].reverse().find(m => filas.some(v => v.mes === m && v.estado === 'facturado'));
+    box.innerHTML = `<dl><dt>Arriendos encontrados</dt><dd>${filas.length}</dd><dt>Meses</dt><dd>${MESES[+mesesN[0].slice(5, 7) - 1]} a ${MESES[+mesesN[mesesN.length - 1].slice(5, 7) - 1]}</dd>
+      <dt>Nuevos</dt><dd>${nuevas.length}</dd><dt>Ya estaban</dt><dd>${filas.length - nuevas.length}</dd><dt>Venta neta nueva</dt><dd>${peso(sumar(nuevas, vNeto))}</dd>
+      <dt>Clientes nuevos</dt><dd>${cNuevos.length}</dd></dl>${cNuevos.length ? `<p class="sec" style="margin:.5rem 0 0;font-size:.85rem">${esc(cNuevos.join(', '))}</p>` : ''}`;
+    $('#impOpc').innerHTML = `<label class="campo" style="margin:12px 0 0">Marcar como pagadas las facturas anteriores a<select name="pagadasAntes"><option value="">Ninguna</option>${mesesN.map(m => `<option value="${m}" ${m === ultFact ? 'selected' : ''}>${nombreMes(m)}</option>`).join('')}</select></label>
+      <p class="ayuda" style="margin:.25rem 0 0">El Excel no dice cuáles facturas ya se pagaron. Las de meses anteriores quedan como pagadas (sin fecha), salvo las que ya traen fecha de pago.</p>`;
+    $('#impBtn').disabled = !nuevas.length;
+  } catch (e) { box.innerHTML = `<span class="sec">No se pudo leer: ${esc(e.message)}</span>`; }
+}
+function aplicarImportacion(ev) {
+  ev.preventDefault();
+  const im = window._imp; if (!im || !im.nuevas.length) return;
+  const antes = ev.target.pagadasAntes ? ev.target.pagadasAntes.value : '';
+  im.nuevas.forEach((v, i) => {
+    const { _ya, ...dato } = v;
+    if (antes && dato.estado === 'facturado' && !dato.fechaPago && dato.mes < antes) dato.estado = 'pagado';
+    ventas().push({ id: 'v' + Date.now() + '-' + i, ...dato });
+  });
+  im.cNuevos.forEach((n, i) => clientes().push({ id: 'cl' + Date.now() + '-' + i, nombre: n, contacto: '', telefono: '', correo: '' }));
+  guardar(); cerrarDlg(); toast(`Importados ${im.nuevas.length} arriendos`); window._imp = null; render();
+}
+async function exportarVentas() {
+  try { await cargarXLSX(); } catch (e) { toast(e.message); return; }
+  const cab = ['Mes', 'Cliente', 'N° OC', 'N° EDP', 'Equipos', 'Desde', 'Hasta', 'Monto neto $', 'IVA 19 % $', 'Total $', 'Valor proveedor', 'Margen', 'Estado', 'N° factura', 'Fecha factura', 'Vence', 'Fecha de pago', 'Notas'];
+  const ET = { pendiente: 'Por facturar', 'en revision': 'En revisión', facturado: 'Facturada', pagado: 'Pagada' };
+  const filas = ventas().slice().sort((a, b) => a.mes.localeCompare(b.mes) || a.cliente.localeCompare(b.cliente, 'es')).map(v =>
+    [nombreMes(v.mes), v.cliente, v.oc, v.edp, v.equipos, v.desde, v.hasta, vNeto(v), Math.round(vNeto(v) * 0.19), vTotal(v), vCosto(v) || '', vMargen(v), ET[v.estado] || v.estado, v.factura, v.fechaFactura, v.estado === 'pagado' ? '' : (venceVenta(v) || ''), v.fechaPago, v.notas]);
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cab, ...filas]), 'Ventas');
+  XLSX.writeFile(wb, `Ventas y caja ${isoLocal(Date.now())}.xlsx`); toast('Excel descargado');
+}
+/* === fin Ventas y caja === */
 
 /* === Clientes (v40): empresas a las que se arrienda === */
 const clientes = () => S.clientes || (S.clientes = []);
@@ -959,7 +1297,7 @@ VISTAS.clientes = () => {
   ${cs.length ? `<div class="lista" style="--cols:minmax(0,2fr) minmax(0,1.6fr) minmax(0,1fr) 24px">
     <div class="lista-cab"><span>Cliente</span><span>Contacto</span><span>Órdenes</span><span></span></div>
     ${cs.map(c => `<a class="lista-fila" href="#clientes" role="button" onclick="dlgCliente('${c.id}');return false">
-      <span class="celda-pri"><b>${esc(c.nombre)}</b><span class="sub">${esc(c.contacto || c.telefono || c.correo || 'Sin contacto')}</span></span>
+      <span class="celda-pri"><b>${esc(c.nombre)}</b><span class="sub">${esc(c.contacto || c.telefono || c.correo || 'Sin contacto')}${c.plazoPago ? ' · paga a ' + c.plazoPago + ' días' : ''}</span></span>
       <span class="opc">${esc(c.contacto || '—')}<span class="sub">${esc(c.telefono || c.correo || '')}</span></span>
       <span class="opc num">${nContratos(c)}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
@@ -974,13 +1312,14 @@ function dlgCliente(id) {
     ${campo('contacto', 'Persona de contacto <span class="ayuda">(opcional)</span>')}
     ${campo('telefono', 'Teléfono <span class="ayuda">(opcional)</span>', 'tel', 'placeholder="+56 9 1234 5678"')}
     ${campo('correo', 'Correo <span class="ayuda">(opcional)</span>', 'email')}
+    ${campo('plazoPago', 'Plazo de pago en días <span class="ayuda">(vacío = ' + (S.config.plazoPagoDias || 30) + ', el normal)</span>', 'number', 'min="1" inputmode="numeric"')}
     <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
     ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarCliente('${id}')">Eliminar cliente</button>`}</form>`);
 }
 function guardarCliente(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target));
-  const dato = { nombre: d.nombre.trim(), contacto: d.contacto.trim(), telefono: d.telefono.trim(), correo: d.correo.trim() };
+  const dato = { nombre: d.nombre.trim(), contacto: d.contacto.trim(), telefono: d.telefono.trim(), correo: d.correo.trim(), plazoPago: d.plazoPago ? Math.max(1, Math.round(Number(d.plazoPago))) : null };
   if (!dato.nombre) { toast('Escribe el nombre de la empresa.'); return; }
   if (clientes().some(c => c.id !== id && normNombre(c.nombre) === normNombre(dato.nombre))) { toast('Ya existe un cliente con ese nombre.'); return; }
   if (id === 'nuevo') clientes().push({ id: 'cl' + Date.now(), ...dato }); else Object.assign(clientes().find(x => x.id === id), dato);
@@ -1000,7 +1339,7 @@ function quitarCliente(id) {
 /* === Leasing (v39): cuota de cada equipo y cuánto queda del arriendo === */
 const leasings = () => S.leasing || (S.leasing = []);
 const peso = v => (v < 0 ? '-$' : '$') + n0(Math.abs(v));
-const pesoCorto = v => { const a = Math.abs(v), sg = v < 0 ? '-$' : '$'; return a >= 1e6 ? sg + n1(a / 1e6) + ' M' : a >= 1e4 ? sg + n0(a / 1e3) + ' mil' : peso(v); };
+const pesoCorto = v => { const a = Math.abs(v), sg = v < 0 ? '-$' : '$'; return a >= 1e6 ? sg + n1(a / 1e6) + ' M' : a >= 1e4 ? sg + n0(a / 1e3) + ' mil' : peso(v); };
 // Cuota fija mensual: tasa anual dividida en 12; el valor final (opción de compra) se paga al terminar. Valores netos, sin IVA.
 function calcLeasing(d) {
   const valor = +d.valor || 0, pie = +d.pie || 0, n = Math.round(+d.plazo) || 0, vf = +d.vf || 0, arriendo = +d.arriendo || 0;
@@ -1175,7 +1514,7 @@ function reiniciar() { if (confirm('¿Volver a los datos de ejemplo originales? 
 VISTAS.inicio = () => {
   const cs = S.camiones, items = itemsAtencion();
   // 1) Estado general: cuántos pendientes y de qué tipo
-  const tipos = [['Mantención', 'mantención'], ['Revisión técnica', 'revisión técnica'], ['Orden de compra', 'orden de compra'], ['Horómetro', 'límite de horas'], ['Sin reporte', 'sin reporte']]
+  const tipos = [['Mantención', 'mantención'], ['Revisión técnica', 'revisión técnica'], ['Orden de compra', 'orden de compra'], ['Factura', 'factura por cobrar'], ['Horómetro', 'límite de horas'], ['Sin reporte', 'sin reporte']]
     .map(([t, nombre]) => [items.filter(x => x.tipo === t).length, nombre]).filter(([n]) => n);
   const peor = items.length ? items[0].e : 'ok';
   // 2) Próximas mantenciones: las que tienen menos horas por delante
@@ -1714,7 +2053,7 @@ function verFoto(src) {
 }
 
 /* ============ Dueño: Avisos (WhatsApp / correo) ============ */
-const GRUPOS = [['Orden de compra', 'Órdenes de compra por vencer'], ['Mantención', 'Mantención'], ['Revisión técnica', 'Revisión técnica'], ['Horómetro', 'Horómetro'], ['Sin reporte', 'Sin reporte']];
+const GRUPOS = [['Factura', 'Facturas por cobrar'], ['Orden de compra', 'Órdenes de compra por vencer'], ['Mantención', 'Mantención'], ['Revisión técnica', 'Revisión técnica'], ['Horómetro', 'Horómetro'], ['Sin reporte', 'Sin reporte']];
 function mensajeResumen() {
   const xs = itemsAtencion();
   const cab = `*${S.config.empresa} · Control de Flota*\nAvisos al ${fecha(Date.now())}\n`;
@@ -2087,6 +2426,10 @@ function ajustesAlertas(cfg) {
       ${fila('con', 'Órdenes de compra', 'En la app', `
         ${n('diasContratoAviso', '🟡 Días antes del término', 'días')}
         ${n('diasContratoUrgente', '🔴 Días antes del término', 'días')}`)}
+      ${fila('fac', 'Facturas por cobrar', 'WhatsApp', `
+        ${n('plazoPagoDias', 'Plazo de pago normal', 'días', 'min="1"')}
+        ${n('diasFacturaAviso', '🟡 Días antes de vencer', 'días')}
+        ${n('diasFacturaUrgente', '🔴 Días antes de vencer', 'días')}`, 'El plazo de cada cliente se cambia en Clientes.')}
       ${fila('sr', 'Camiones sin reporte', 'En la app', `
         ${n('diasSinReporte', 'Días sin registrar', 'días')}`, 'Solo camiones arrendados.')}
     </section>
@@ -2118,6 +2461,7 @@ function pintarEjemplos(c) {
   res('lim', `Avisa al ${c.pctAviso} % del límite`);
   res('rt', `Avisa ${d(c.diasPorVencer)} antes`);
   res('con', `Avisa ${d(c.diasContratoAviso)} antes del término`);
+  res('fac', `Paga a ${d(c.plazoPagoDias)} · avisa ${d(c.diasFacturaAviso)} antes`);
   res('sr', `Después de ${d(c.diasSinReporte)} sin registros`);
   // Ejemplos de una línea con los números que se están escribiendo
   const resumen = c.resumenFrec === 'diario' ? `📋 resumen todos los días a las ${hh(c.horaAvisos)}`
@@ -2129,6 +2473,7 @@ function pintarEjemplos(c) {
   pon('lim', `Ej.: límite de <b>12.000 h</b> → 🟡 a las <b>${n0(12000 * c.pctAviso / 100)} h</b> · 🔴 a las <b>${n0(12000 * c.pctUrgente / 100)} h</b>`);
   pon('rt', `Ej.: vence el <b>${dia(45)}</b> → 🟡 el <b>${dia(45 - c.diasPorVencer)}</b> · 🔴 el <b>${dia(45 - c.diasUrgente)}</b>`);
   pon('con', `Ej.: termina el <b>${dia(90)}</b> → 🟡 el <b>${dia(90 - c.diasContratoAviso)}</b> · 🔴 el <b>${dia(90 - c.diasContratoUrgente)}</b>`);
+  pon('fac', `Ej.: factura de hoy → vence el <b>${dia(c.plazoPagoDias)}</b> → 🟡 el <b>${dia(c.plazoPagoDias - c.diasFacturaAviso)}</b> · 🔴 el <b>${dia(c.plazoPagoDias - c.diasFacturaUrgente)}</b>`);
   pon('sr', `Ej.: último registro hoy → aparece "sin reporte" el <b>${dia(c.diasSinReporte + 1)}</b>`);
 }
 function guardarAlertas(ev) {
@@ -2139,9 +2484,10 @@ function guardarAlertas(ev) {
   nuevo.validarSalto = ev.target.validarSalto.checked; nuevo.avisoInmediato = ev.target.avisoInmediato.checked;
   nuevo.resumenFrec = ev.target.resumenFrec.value; nuevo.resumenDia = Number(ev.target.resumenDia.value) || 1; nuevo.horaAvisos = Number(ev.target.horaAvisos.value);
   const abrir = id => { const el = $('#aj-' + id); if (el) el.open = true; }; // abre la fila con el error
+  if (nuevo.plazoPagoDias < 1) { abrir('fac'); toast('El plazo de pago debe ser de 1 día o más'); return; }
   if (nuevo.intervaloMant < 1) { abrir('mant'); toast('La mantención debe ser cada 1 hora o más'); return; }
   if (nuevo.horasMantAviso >= nuevo.intervaloMant) { abrir('mant'); toast('El aviso de mantención debe ser menor que el intervalo de mantención'); return; }
-  const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención', 'mant'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica', 'rt'], ['diasContratoUrgente', 'diasContratoAviso', 'Órdenes de compra', 'con']]
+  const malos = [['horasMantUrgente', 'horasMantAviso', 'Mantención', 'mant'], ['diasUrgente', 'diasPorVencer', 'Revisión técnica', 'rt'], ['diasContratoUrgente', 'diasContratoAviso', 'Órdenes de compra', 'con'], ['diasFacturaUrgente', 'diasFacturaAviso', 'Facturas por cobrar', 'fac']]
     .filter(([u, a]) => nuevo[u] > nuevo[a]);
   if (nuevo.pctAviso > nuevo.pctUrgente) malos.push([, , 'Límite de horas', 'lim']);
   if (malos.length) { malos.forEach(x => abrir(x[3])); toast(`Revisa ${malos.map(x => x[2]).join(', ')}: el 🔴 urgente debe llegar después del 🟡 primer aviso`); return; }

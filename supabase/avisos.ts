@@ -80,6 +80,23 @@ function revisar(cam: any, ls: { valor: number; fecha: number }[], ficha: any, c
 }
 // "🟡 Por vencer · Mantención\nHKTZ48: faltan…" → "🟡 HKTZ48: faltan…" (para el resumen)
 const lineaCorta = (texto: string) => `${texto.split(' ')[0]} ${texto.split('\n')[1] ?? ''}`;
+// Facturas emitidas y no pagadas: vencen a los N días de la fecha de factura (plazo del cliente, o el normal de Configuración)
+function avisosFacturas(datos: any, cfg: any) {
+  const ETQ: Record<string, string> = { porvencer: '🟡 Por vencer', urgente: '🔴 Urgente', vencido: '🔴 Atrasada' };
+  const norm = (t: unknown) => String(t ?? '').trim().toLowerCase();
+  const out: { clave: string; texto: string }[] = [];
+  for (const v of datos.ventas ?? []) {
+    if (v.estado !== 'facturado' || !v.fechaFactura) continue;
+    const cl = (datos.clientes ?? []).find((c: any) => norm(c.nombre) === norm(v.cliente));
+    const plazo = Number(cl?.plazoPago) || Number(cfg.plazoPagoDias ?? 30);
+    const d = diasHasta(new Date(utc(v.fechaFactura) + plazo * DIA).toISOString().slice(0, 10));
+    const e = d < 0 ? 'vencido' : d <= (cfg.diasFacturaUrgente ?? 2) ? 'urgente' : d <= (cfg.diasFacturaAviso ?? 7) ? 'porvencer' : 'ok';
+    if (e === 'ok') continue;
+    const total = Math.round((Number(v.neto) || 0) * 1.19);
+    out.push({ clave: `factura|${v.id}|${e}`, texto: `${ETQ[e]} · Factura por cobrar\n${v.cliente}: factura ${v.factura || 's/n'} por $${n0(total)}, ${d < 0 ? `atrasada ${-d} ${d === -1 ? 'día' : 'días'}` : d === 0 ? 'vence hoy' : `vence en ${d} ${d === 1 ? 'día' : 'días'}`}.` });
+  }
+  return out;
+}
 const DIAS_SEMANA = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 Deno.serve(async (req) => {
@@ -133,6 +150,20 @@ Deno.serve(async (req) => {
       const rs = await Promise.all(destinos.map((d) => enviarWsp(d, a.texto)));
       if (rs.some((x) => x.ok)) enviados++;
       else await db.from('avisos_enviados').delete().eq('clave', a.clave); // no salió: se reintenta en el próximo registro
+    }
+  }
+
+  // Facturas por cobrar: en la revisión de todo (tarea diaria o "Revisar ahora"), no al registrar el horómetro de un camión
+  if (!patente) {
+    const fa = avisosFacturas(datos, cfg);
+    pendientes.push(...fa.map((x) => lineaCorta(x.texto)));
+    if (destinos.length && cfg.avisoInmediato !== false) {
+      for (const x of fa) {
+        const { error } = await db.from('avisos_enviados').insert({ clave: x.clave, detalle: x.texto });
+        if (error) continue; // ya se había enviado
+        const rs = await Promise.all(destinos.map((d) => enviarWsp(d, x.texto)));
+        if (rs.some((r) => r.ok)) enviados++; else await db.from('avisos_enviados').delete().eq('clave', x.clave);
+      }
     }
   }
 
