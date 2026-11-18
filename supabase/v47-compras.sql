@@ -16,6 +16,7 @@ create table if not exists compras (
 alter table compras add column if not exists mes_servicio text not null default '';  -- 'AAAA-MM'
 alter table compras add column if not exists abonado numeric;                         -- monto pagado con IVA (pago parcial)
 alter table compras add column if not exists pagos jsonb;                             -- pagos en cuotas: [{id, fecha, monto, pagado}]
+alter table compras add column if not exists tipo text not null default 'afecta';     -- 'afecta' (con IVA 19 %) | 'exenta' (sin IVA)
 -- las facturas que ya existían: su mes de servicio es el mes de la factura
 update compras set mes_servicio = to_char(fecha, 'YYYY-MM') where mes_servicio = '' and fecha is not null;
 alter table compras enable row level security;
