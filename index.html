@@ -278,6 +278,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .lista-simple{margin:0;padding-left:1.1rem;color:var(--texto-2)}
 @media (max-width:719px){
   .lista-cab{display:none}
+  .num-estado{text-align:right}
   .lista-fila{grid-template-columns:var(--cols-m,minmax(0,1fr) auto)}
   .lista-fila .opc,.lista-fila .opc-sub,.opc-txt{display:none}
   .solo-movil{display:inline}
@@ -389,6 +390,7 @@ details.tarjeta summary{cursor:pointer;min-height:28px}
 .docs li{display:flex;align-items:center;gap:8px;padding:.5rem 0;border-bottom:1px solid var(--borde)}
 .docs li button.doc{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
 .docs li button.doc b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.num-estado{text-align:left}
 .lin{border:1px solid var(--borde);border-radius:12px;padding:10px;margin-bottom:8px;background:#fff}
 .din{font-size:.8em;white-space:nowrap;display:inline-block}
 .prev-leas{position:sticky;top:-18px;z-index:2;box-shadow:0 6px 8px -6px rgba(0,0,0,.2);background:#F8FAFC;border:1px solid var(--borde);border-radius:12px;padding:12px;margin-top:4px}
@@ -1142,21 +1144,22 @@ function vistaMes(mes, ms) {
   const nEq = v => { const n = v.lineas ? v.lineas.length : 0; return n > 1 ? n + ' equipos' : ''; };
   return `
   <section class="tarjeta nota" style="margin-bottom:12px"><p class="sec" style="margin:0"><b>Por aclarar con el cliente:</b> qué significa el N° EDP. Mientras tanto se guarda tal como viene en el Excel.</p></section>
-  <label class="campo" style="margin-bottom:12px">Mes<select onchange="location.hash='finanzas?tab=mes&mes='+this.value">${lista.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nombreMes(m)}</option>`).join('')}</select></label>
+  <label class="campo" style="margin-bottom:12px">Mes de servicio<select onchange="location.hash='finanzas?tab=mes&mes='+this.value">${lista.map(m => `<option value="${m}" ${m === mes ? 'selected' : ''}>${nombreMes(m)}</option>`).join('')}</select></label>
   <div class="kpis k3">
     ${kpiM('', pesoCorto(neto), 'Venta neta', 'dollar')}
     ${kpi('', neto ? Math.round(fact / neto * 100) + ' %' : '—', 'Facturado', 'file')}
     ${kpiM('', pesoCorto(neto - fact), 'Por facturar', 'clock')}
   </div>
-  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,1.1fr) 24px">
-    <div class="lista-cab"><span>Cliente</span><span>Equipos</span><span>Neto</span><span>IVA</span><span>Total</span><span>Estado</span><span></span></div>
+  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.7fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1fr) 24px">
+    <div class="lista-cab"><span>Cliente</span><span>Equipo</span><span>Neto</span><span>Total</span><span>Estado</span><span>Mes de servicio</span><span></span></div>
     ${vs.map(v => `<a class="lista-fila" href="#finanzas?tab=mes" role="button" onclick="dlgVenta('${v.id}');return false">
-      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${v.oc ? 'OC ' + esc(v.oc) : v.factura ? 'Factura ' + esc(v.factura) : 'Sin factura'}<span class="solo-movil"> · ${esc(nEq(v) || v.equipos || 'sin equipos')}</span></span></span>
+      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${v.oc ? 'OC ' + esc(v.oc) : v.factura ? 'Factura ' + esc(v.factura) : 'Sin factura'}<span class="solo-movil"> · ${esc(nEq(v) || v.equipos || 'sin equipos')} · ${esc(nombreMes(v.mes))}</span></span></span>
       <span class="opc">${esc(v.equipos || '—')}${nEq(v) ? `<span class="sub">${nEq(v)}${v.proveedor ? ' · con equipos de terceros' : ''}</span>` : v.proveedor ? '<span class="sub">equipo de tercero</span>' : ''}</span>
-      <span class="opc num">${peso(vNeto(v))}</span><span class="opc num">${peso(Math.round(vNeto(v) * 0.19))}</span><span class="opc num"><b>${peso(vTotal(v))}</b></span>
-      <span class="num-estado" style="text-align:right"><b class="num solo-movil-bloque">${pesoCorto(vTotal(v))}</b>${chipVenta(v)}</span>
+      <span class="opc num">${peso(vNeto(v))}</span><span class="opc num"><b>${peso(vTotal(v))}</b></span>
+      <span class="num-estado"><b class="num solo-movil-bloque">${pesoCorto(vTotal(v))}</b>${chipVenta(v)}</span>
+      <span class="opc">${esc(nombreMes(v.mes))}</span>
       <span class="opc sec">${ic('chevron')}</span></a>`).join('')}
-    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc num">${peso(neto)}</span><span class="opc num">${peso(Math.round(neto * 0.19))}</span><span class="opc num">${peso(sumar(vs, vTotal))}</span><span class="solo-movil-bloque num">${pesoCorto(sumar(vs, vTotal))}</span><span class="opc"></span><span class="opc"></span></div>
+    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc num">${peso(neto)}</span><span class="opc num">${peso(sumar(vs, vTotal))}</span><span class="solo-movil-bloque num">${pesoCorto(sumar(vs, vTotal))}</span><span class="opc"></span><span class="opc"></span></div>
   </div>
   <p class="ayuda">Toca una fila para ver el detalle de sus equipos y editarlo. Ganancia del mes: ${peso(sumar(vs, vMargen))}.</p>`
   : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">No hay órdenes de compra en ${nombreMes(mes)}.</p><button class="btn cta" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Agregar la primera</button></div>`}`;
@@ -1208,7 +1211,7 @@ function dlgVenta(id, mesPre) {
     <label class="campo" style="margin:12px 0 10px">Cliente<input name="cliente" required list="lsClientes2" autocomplete="off" value="${esc(v.cliente)}"></label>
     <datalist id="lsClientes2">${clientes().map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
     <datalist id="lsEquipos2">${S.camiones.map(c => `<option value="${esc(etq(c))}">`).join('')}</datalist>
-    <div class="grid grid-2">${t('oc', 'N° de orden de compra')}${t('mes', 'Mes', 'month', 'required')}</div>
+    <div class="grid grid-2">${t('oc', 'N° de orden de compra')}${t('mes', 'Mes de servicio', 'month', 'required')}</div>
     <div class="grid grid-2">${t('desde', 'Desde', 'date')}${t('hasta', 'Hasta', 'date')}</div>
     <h3 style="margin:.5rem 0">Equipos <span class="sec" style="font-weight:400;font-size:.9rem">(${ls.length === 1 && !v.lineas && /( y | - |,)/.test(v.equipos || '') ? 'este arriendo trae varios equipos juntos: sepáralos y reparte el monto' : 'monto neto de cada uno'})</span></h3>
     <div id="lineas">${ls.map(filaLinea).join('')}</div>
