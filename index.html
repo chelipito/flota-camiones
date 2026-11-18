@@ -471,6 +471,32 @@ const ic = id => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><use h
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const n0 = v => Math.round(v).toLocaleString('es-CL');
 const n1 = v => Number(v).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+/* Formatos automáticos al escribir: montos ($1.234.567), RUT (12.345.678-5) y teléfonos (+56 9 1234 5678).
+   Un campo de monto lleva data-fmt="peso"; el de RUT, data-fmt="rut"; los type="tel" se formatean solos. Al guardar se lee con numM(). */
+const soloDigitos = t => String(t ?? '').replace(/\D/g, '');
+const numM = v => Number(soloDigitos(v).slice(0, 12)) || 0; // lee un monto escrito con $ y puntos
+const vM = v => v === '' || v == null || isNaN(Number(v)) ? '' : '$' + n0(Number(v)); // monto listo para mostrar en el campo
+const fmtMontoVivo = t => { const d = soloDigitos(t).slice(0, 12); return d ? '$' + n0(Number(d)) : ''; };
+const fmtRutVivo = t => { let r = String(t).toUpperCase().replace(/[^0-9K]/g, '').replace(/K(?=.)/g, '').slice(0, 9); return r.length < 2 ? r : r.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.') + '-' + r.slice(-1); };
+const fmtTelVivo = t => {
+  const s = String(t); if (/^\s*\+(?!56)/.test(s)) return s; // número de otro país: se deja como se escribe
+  let d = soloDigitos(s); if (d.startsWith('56')) d = d.slice(2);
+  d = d.slice(0, 9); if (!d) return /^\s*\+/.test(s) && s.trim().length > 1 ? '+56' : '';
+  return '+56 ' + [d.slice(0, 1), d.slice(1, 5), d.slice(5, 9)].filter(Boolean).join(' ');
+};
+document.addEventListener('input', e => {
+  const t = e.target; if (!(t instanceof HTMLInputElement)) return;
+  const fmt = t.dataset.fmt || (t.type === 'tel' ? 'tel' : ''); if (!fmt) return;
+  const sig = fmt === 'rut' ? /[0-9K]/i : /\d/, pos = t.selectionStart ?? t.value.length;
+  const antes = [...t.value.slice(0, pos)].filter(c => sig.test(c)).length; // dígitos a la izquierda del cursor
+  const antesLargo = t.value.length;
+  const nuevo = fmt === 'peso' ? fmtMontoVivo(t.value) : fmt === 'rut' ? fmtRutVivo(t.value) : fmtTelVivo(t.value);
+  if (nuevo === t.value) return;
+  t.value = nuevo;
+  let i = nuevo.length, n = 0; // si se escribía al final, el cursor queda al final (también en teléfonos, que agregan el +56)
+  if (pos < antesLargo && fmt !== 'tel') { i = 0; if (antes) for (; i < nuevo.length; i++) if (sig.test(nuevo[i]) && ++n === antes) { i++; break; } }
+  try { t.setSelectionRange(i, i); } catch (er) { /* algunos tipos no permiten mover el cursor */ }
+}, true);
 const pad = v => String(v).padStart(2, '0');
 const hoy0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 const isoLocal = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
@@ -576,7 +602,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '60'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '61'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1214,7 +1240,7 @@ function dlgCompra(id, mesPre) {
       <label class="campo" style="margin-bottom:10px">Mes de servicio<input name="mesServicio" type="month" required value="${mesServicioC(c)}"></label>
     </div>
     <label class="campo" style="margin-bottom:10px">Tipo de factura<select name="tipo" onchange="cambiarNPagos(this.form)"><option value="afecta" ${c.tipo !== 'exenta' ? 'selected' : ''}>Afecta (con IVA 19 %)</option><option value="exenta" ${c.tipo === 'exenta' ? 'selected' : ''}>Exenta (sin IVA)</option></select></label>
-    <label class="campo" style="margin-bottom:10px">Monto neto ($)<input name="neto" type="number" min="0" step="any" inputmode="decimal" required value="${c.neto ?? ''}" oninput="cambiarNPagos(this.form)"></label>
+    <label class="campo" style="margin-bottom:10px">Monto neto ($)<input name="neto" type="text" data-fmt="peso" inputmode="numeric" autocomplete="off" required value="${vM(c.neto)}" oninput="cambiarNPagos(this.form)"></label>
     <label class="campo" style="margin-bottom:10px">Estado de la factura<select name="estado" onchange="prevCompra(this.form)"><option value="pendiente" ${c.estado === 'pendiente' || !c.estado ? 'selected' : ''}>Por pagar</option><option value="parcial" ${c.estado === 'parcial' ? 'selected' : ''}>Pago parcial</option><option value="pagada" ${c.estado === 'pagada' ? 'selected' : ''}>Pagado</option></select></label>
     <div id="cPagos" style="display:none">
       <label class="campo" style="margin-bottom:10px">Número de pagos<select name="nPagos" onchange="cambiarNPagos(this.form)">${Array.from({ length: 11 }, (_, i) => `<option value="${i + 2}">${i + 2} pagos</option>`).join('')}</select></label>
@@ -1238,10 +1264,10 @@ function dlgCompra(id, mesPre) {
 }
 // Pagos en cuotas: cada fila trae fecha, monto (con IVA) y si ya se pagó. Los pagados quedan fijos; el resto se reparte en partes iguales.
 function leerPagos(f) {
-  return [...document.querySelectorAll('#cFilas > div')].map((_, i) => ({ fecha: f['pf' + i].value, monto: Math.round(Number(f['pm' + i].value) || 0), pagado: f['pe' + i].value === '1' }));
+  return [...document.querySelectorAll('#cFilas > div')].map((_, i) => ({ fecha: f['pf' + i].value, monto: numM(f['pm' + i].value), pagado: f['pe' + i].value === '1' }));
 }
 function filasPagos(f, n, previos) {
-  const tot = totalFactura(Number(f.neto.value) || 0, f.tipo.value), base = f.fecha.value || isoLocal(Date.now());
+  const tot = totalFactura(numM(f.neto.value), f.tipo.value), base = f.fecha.value || isoLocal(Date.now());
   const pag = previos.filter(x => x.pagado), pen = previos.filter(x => !x.pagado);
   n = Math.min(12, Math.max(n, pag.length, 2));
   const libres = n - pag.length, resto = Math.max(0, tot - sumar(pag, x => Number(x.monto) || 0)), cuota = libres ? Math.floor(resto / libres) : 0;
@@ -1254,7 +1280,7 @@ function pintarPagos(f, filas) {
     <b>Pago ${i + 1}</b> <span class="ayuda" id="pa${i}" style="color:var(--ur-t)"></span>
     <div class="grid grid-2">
       <label class="campo" style="margin:6px 0 0">Fecha de pago<input name="pf${i}" type="date" value="${x.fecha || ''}" onchange="prevCompra(this.form)"></label>
-      <label class="campo" style="margin:6px 0 0">Monto con IVA ($)<input name="pm${i}" type="number" min="0" step="any" inputmode="decimal" value="${x.monto}" oninput="prevCompra(this.form)"></label>
+      <label class="campo" style="margin:6px 0 0">Monto con IVA ($)<input name="pm${i}" type="text" data-fmt="peso" inputmode="numeric" autocomplete="off" value="${vM(x.monto)}" oninput="prevCompra(this.form)"></label>
     </div>
     <label class="campo" style="margin:6px 0 0">Estado de pago<select name="pe${i}" onchange="prevCompra(this.form)"><option value="0" ${x.pagado ? '' : 'selected'}>Pendiente</option><option value="1" ${x.pagado ? 'selected' : ''}>Pagado</option></select></label></div>`).join('');
 }
@@ -1263,7 +1289,7 @@ function cambiarNPagos(f) { // cambió el número de pagos o el monto neto: se r
   prevCompra(f);
 }
 function prevCompra(f) {
-  const n = Number(f.neto.value) || 0, box = $('#prevCompra'), exenta = f.tipo.value === 'exenta', tot = totalFactura(n, f.tipo.value), parcial = f.estado.value === 'parcial';
+  const n = numM(f.neto.value), box = $('#prevCompra'), exenta = f.tipo.value === 'exenta', tot = totalFactura(n, f.tipo.value), parcial = f.estado.value === 'parcial';
   $('#cPagos').style.display = parcial ? '' : 'none';
   $('#cFPago').style.display = f.estado.value === 'pagada' ? '' : 'none';
   let falta = '';
@@ -1279,7 +1305,7 @@ function prevCompra(f) {
 function guardarCompra(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target)), hoy = isoLocal(Date.now());
-  const dato = { proveedor: d.proveedor.trim(), factura: d.factura.trim(), fecha: d.fecha, mesServicio: d.mesServicio, vence: d.vence || '', neto: Number(d.neto) || 0, estado: d.estado, tipo: d.tipo === 'exenta' ? 'exenta' : 'afecta', abonado: null, pagos: null, fechaPago: d.fechaPago || '', notas: d.notas.trim() };
+  const dato = { proveedor: d.proveedor.trim(), factura: d.factura.trim(), fecha: d.fecha, mesServicio: d.mesServicio, vence: d.vence || '', neto: numM(d.neto), estado: d.estado, tipo: d.tipo === 'exenta' ? 'exenta' : 'afecta', abonado: null, pagos: null, fechaPago: d.fechaPago || '', notas: d.notas.trim() };
   if (!dato.proveedor) { toast('Falta el proveedor.'); return; }
   if (!(dato.neto > 0)) { toast('El monto neto debe ser mayor que cero.'); return; }
   if (!proveedorDe(dato.proveedor)) maestroProv().push({ id: 'pv' + Date.now(), nombre: dato.proveedor, rut: '', direccion: '', encargado: '', rutEncargado: '', correo: '' });
@@ -1406,8 +1432,8 @@ const camionDeTexto = t => { const n = normTxt(t); return n ? S.camiones.find(c 
 const filaLinea = l => `<div class="lin">
   <label class="campo" style="margin-bottom:8px">Equipo<input class="l-equipo" list="lsEquipos2" autocomplete="off" value="${esc(l.equipo)}" placeholder="Ej.: GHO-007"></label>
   <div class="grid grid-2">
-    <label class="campo" style="margin-bottom:8px">Neto $<input class="l-neto" type="number" min="0" step="any" inputmode="decimal" value="${l.neto ?? ''}"></label>
-    <label class="campo l-leas-w" style="margin-bottom:8px" ${l.tercero ? '' : 'hidden'}>Leasing $<input class="l-leas" type="number" min="0" step="any" inputmode="decimal" value="${l.leasing ?? ''}"></label>
+    <label class="campo" style="margin-bottom:8px">Neto $<input class="l-neto" type="text" data-fmt="peso" inputmode="numeric" autocomplete="off" value="${vM(l.neto)}"></label>
+    <label class="campo l-leas-w" style="margin-bottom:8px" ${l.tercero ? '' : 'hidden'}>Leasing $<input class="l-leas" type="text" data-fmt="peso" inputmode="numeric" autocomplete="off" value="${vM(l.leasing)}"></label>
   </div>
   <label class="check" style="margin-bottom:6px"><input type="checkbox" class="l-ter" ${l.tercero ? 'checked' : ''}> El equipo no es mío (de un tercero)</label>
   <div class="fila entre"><span class="sec l-calc"></span><button type="button" class="btn chico peligro" onclick="quitarLinea(this)">Quitar equipo</button></div>
@@ -1457,7 +1483,7 @@ function quitarLinea(btn) {
 }
 function leerLineas(f) {
   return [...f.querySelectorAll('.lin')].map((r, i) => { const ter = r.querySelector('.l-ter').checked, le = r.querySelector('.l-leas').value;
-    return { id: 'l' + (i + 1), equipo: r.querySelector('.l-equipo').value.trim(), neto: Number(r.querySelector('.l-neto').value) || 0, tercero: ter, leasing: ter && le !== '' ? Number(le) : null }; });
+    return { id: 'l' + (i + 1), equipo: r.querySelector('.l-equipo').value.trim(), neto: numM(r.querySelector('.l-neto').value), tercero: ter, leasing: ter && le !== '' ? numM(le) : null }; });
 }
 // Cálculos al instante: cada equipo muestra su IVA y total; arriba, los totales de la orden
 function prevVenta(f) {
@@ -1722,10 +1748,10 @@ function dlgProveedor(id) {
   const campo = (n, t, tipo = 'text', extra = '') => `<label class="campo" style="margin-bottom:10px">${t}<input name="${n}" type="${tipo}" value="${esc(p[n])}" ${extra}></label>`;
   dialogo(`<form onsubmit="guardarProveedor(event,'${id}')"><h2>${nuevo ? 'Nuevo proveedor' : 'Editar proveedor'}</h2>
     ${campo('nombre', 'Nombre o razón social', 'text', 'required autocomplete="off"')}
-    ${campo('rut', 'RUT <span class="ayuda">(ej. 76.123.456-7)</span>', 'text', 'placeholder="76.123.456-7" autocomplete="off"')}
+    ${campo('rut', 'RUT <span class="ayuda">(ej. 76.123.456-7)</span>', 'text', 'data-fmt="rut" inputmode="text" placeholder="76.123.456-7" autocomplete="off"')}
     ${campo('direccion', 'Dirección', 'text', 'autocomplete="off"')}
     ${campo('encargado', 'Nombre del representante o encargado', 'text', 'autocomplete="off"')}
-    ${campo('rutEncargado', 'RUT del representante o encargado', 'text', 'placeholder="12.345.678-5" autocomplete="off"')}
+    ${campo('rutEncargado', 'RUT del representante o encargado', 'text', 'data-fmt="rut" inputmode="text" placeholder="12.345.678-5" autocomplete="off"')}
     ${campo('correo', 'Correo electrónico', 'email')}
     <div class="acciones" style="margin-top:1rem"><button type="button" class="btn" style="flex:1" onclick="cerrarDlg()">Cancelar</button><button class="btn pri" style="flex:1">Guardar</button></div>
     ${nuevo ? '' : `<button type="button" class="btn peligro" style="width:100%;margin-top:8px" onclick="quitarProveedor('${id}')">Eliminar proveedor</button>`}</form>`);
@@ -1803,10 +1829,13 @@ VISTAS.leasing = () => {
   <p class="ayuda">Valores netos, sin IVA. La tasa anual se divide en 12 meses.</p>`
   : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">Todavía no hay equipos con leasing.</p><button class="btn cta" onclick="dlgLeasing('nuevo')">${ic('plus')}Agregar el primero</button></div>`}`;
 };
+const MONTOS_LEASING = ['valor', 'pie', 'vf', 'arriendo']; // campos en pesos
 function dlgLeasing(id) {
   const nuevo = id === 'nuevo', l = nuevo ? { equipo: '', valor: '', pie: 0, plazo: 48, tasa: '', vf: 0, arriendo: '', inicio: '' } : leasings().find(x => x.id === id);
   if (!l) return;
-  const campo = (n, t, extra = '') => `<label class="campo" style="margin-bottom:10px">${t}<input name="${n}" type="number" min="0" step="any" inputmode="decimal" value="${l[n] ?? ''}" ${extra} oninput="prevLeasing(this.form)"></label>`;
+  const campo = (n, t, extra = '') => MONTOS_LEASING.includes(n)
+    ? `<label class="campo" style="margin-bottom:10px">${t}<input name="${n}" type="text" data-fmt="peso" inputmode="numeric" autocomplete="off" value="${vM(l[n])}" ${extra} oninput="prevLeasing(this.form)"></label>`
+    : `<label class="campo" style="margin-bottom:10px">${t}<input name="${n}" type="number" min="0" step="any" inputmode="decimal" value="${l[n] ?? ''}" ${extra} oninput="prevLeasing(this.form)"></label>`;
   dialogo(`<form class="ancho-f" onsubmit="guardarLeasing(event,'${id}')"><h2>${nuevo ? 'Nuevo leasing' : 'Editar leasing'}</h2>
     <div class="prev-leas" id="prevLeas" aria-live="polite"></div>
     <label class="campo" style="margin:12px 0 10px">Equipo<input name="equipo" required value="${esc(l.equipo)}" list="lsEquipos" placeholder="Patente o nombre" autocomplete="off"></label>
@@ -1824,7 +1853,8 @@ function dlgLeasing(id) {
   prevLeasing(document.querySelector('dialog.dlg form'));
 }
 function prevLeasing(f) {
-  const d = Object.fromEntries(new FormData(f)), r = calcLeasing(d), box = $('#prevLeas');
+  const d = Object.fromEntries(new FormData(f)); MONTOS_LEASING.forEach(k => { d[k] = numM(d[k]); });
+  const r = calcLeasing(d), box = $('#prevLeas');
   if (!box) return;
   if (!r) { box.innerHTML = '<span class="sec">Escribe el valor, el plazo y la tasa para ver la cuota.</span>'; return; }
   box.innerHTML = `<dl><dt>Cuota mensual</dt><dd class="grande">${peso(r.cuota)}</dd>
@@ -1835,7 +1865,7 @@ function prevLeasing(f) {
 function guardarLeasing(ev, id) {
   ev.preventDefault();
   const d = Object.fromEntries(new FormData(ev.target));
-  const num = k => d[k] === '' ? 0 : Number(d[k]);
+  const num = k => MONTOS_LEASING.includes(k) ? numM(d[k]) : d[k] === '' ? 0 : Number(d[k]);
   const dato = { equipo: d.equipo.trim(), valor: num('valor'), pie: num('pie'), plazo: Math.round(num('plazo')), tasa: num('tasa'), vf: num('vf'), arriendo: num('arriendo'), inicio: d.inicio || '' };
   if (!(dato.valor > 0)) { toast('El valor del equipo debe ser mayor que cero.'); return; }
   if (dato.pie >= dato.valor) { toast('El pie debe ser menor que el valor del equipo.'); return; }
@@ -2364,7 +2394,7 @@ VISTAS['editar-contrato'] = (id, q) => {
       ${campo('empresa', 'Cliente', k.empresa, 'text', 'required list="lsClientes" autocomplete="off"')}
       <datalist id="lsClientes">${clientes().map(c => `<option value="${esc(c.nombre)}">`).join('')}</datalist>
       ${campo('faena', 'Faena o lugar de trabajo', k.faena)}
-      ${campo('monto', 'Monto neto ($) <span class="ayuda">(opcional)</span>', k.monto ?? '', 'number', 'min="0" step="any" inputmode="decimal"')}
+      ${campo('monto', 'Monto neto ($) <span class="ayuda">(opcional)</span>', vM(k.monto), 'text', 'data-fmt="peso" inputmode="numeric" autocomplete="off"')}
     </fieldset>
     <fieldset><legend>Período de arriendo</legend><div class="grid grid-2">
       ${campo('inicio', 'Desde', k.inicio, 'date', 'required')}
@@ -2390,7 +2420,7 @@ function guardarContrato(ev, id) {
   if (!sel.length) { toast('Elige al menos un equipo'); return; }
   const numero = d.numero.trim();
   if (S.contratos.some(x => x.id !== id && normNombre(x.numero) === normNombre(numero))) { toast('Ya existe una orden de compra con ese número'); return; }
-  const datos = { numero, empresa: d.empresa.trim(), faena: d.faena.trim(), monto: d.monto === '' ? null : Number(d.monto), inicio: d.inicio, termino: d.termino, notas: d.notas.trim(),
+  const datos = { numero, empresa: d.empresa.trim(), faena: d.faena.trim(), monto: d.monto.trim() === '' ? null : numM(d.monto), inicio: d.inicio, termino: d.termino, notas: d.notas.trim(),
     admin: { nombre: d.adminNombre.trim(), cargo: '', telefono: d.adminTelefono.trim(), correo: d.adminCorreo.trim() } };
   let k;
   if (id === 'nuevo') { k = { id: 'k' + Date.now(), ...datos }; S.contratos.push(k); }
