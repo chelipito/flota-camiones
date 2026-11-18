@@ -576,7 +576,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '49'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '50'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1165,16 +1165,17 @@ function vistaMes(mes, ms) {
     ${kpi('', neto ? Math.round(fact / neto * 100) + ' %' : '—', 'Facturado', 'file')}
     ${kpiM('', pesoCorto(neto - fact), 'Por facturar', 'clock')}
   </div>
-  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.3fr) minmax(0,1.7fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1fr) 24px">
-    <div class="lista-cab"><span>Cliente</span><span>Equipo</span><span>Neto</span><span>Total</span><span>Estado</span><span>Mes de servicio</span><span></span></div>
+  ${vs.length ? `<div class="lista" style="--cols:minmax(0,1.2fr) minmax(0,1.5fr) minmax(0,.9fr) minmax(0,.9fr) minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr) 24px">
+    <div class="lista-cab"><span>Cliente</span><span>Equipo</span><span>Neto</span><span>Total</span><span>Estado</span><span>Mes de servicio</span><span>Mes de facturación</span><span></span></div>
     ${vs.map(v => { const atr = sinFacturarVencido(v); return `<a class="lista-fila${atr ? ' sinfact' : ''}" href="#finanzas?tab=mes" role="button" onclick="dlgVenta('${v.id}');return false">
-      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${v.oc ? 'OC ' + esc(v.oc) : v.factura ? 'Factura ' + esc(v.factura) : 'Sin factura'}<span class="solo-movil"> · ${esc(nEq(v) || v.equipos || 'sin equipos')} · ${esc(nombreMes(v.mes))}</span></span>${atr ? `<span class="aviso-nar">Debió facturarse en ${nomMes}</span>` : ''}</span>
+      <span class="celda-pri"><b>${esc(v.cliente)}</b><span class="sub">${v.oc ? 'OC ' + esc(v.oc) : v.factura ? 'Factura ' + esc(v.factura) : 'Sin factura'}<span class="solo-movil"> · ${esc(nEq(v) || v.equipos || 'sin equipos')} · servicio ${esc(MESES[+v.mes.slice(5, 7) - 1].toLowerCase())} · facturación ${esc(MESES[+mesDe(v).slice(5, 7) - 1].toLowerCase())}</span></span>${atr ? `<span class="aviso-nar">Debió facturarse en ${nomMes}</span>` : ''}</span>
       <span class="opc">${esc(v.equipos || '—')}${nEq(v) ? `<span class="sub">${nEq(v)}${v.proveedor ? ' · con equipos de terceros' : ''}</span>` : v.proveedor ? '<span class="sub">equipo de tercero</span>' : ''}</span>
       <span class="opc num">${peso(vNeto(v))}</span><span class="opc num"><b>${peso(vTotal(v))}</b></span>
       <span class="num-estado"><b class="num solo-movil-bloque">${pesoCorto(vTotal(v))}</b>${atr ? estado('porvencer', 'Sin facturar') : chipVenta(v)}</span>
       <span class="opc">${esc(nombreMes(v.mes))}</span>
+      <span class="opc"><b>${esc(nombreMes(mesDe(v)))}</b></span>
       <span class="opc sec">${ic('chevron')}</span></a>`; }).join('')}
-    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc num">${peso(neto)}</span><span class="opc num">${peso(sumar(vs, vTotal))}</span><span class="solo-movil-bloque num">${pesoCorto(sumar(vs, vTotal))}</span><span class="opc"></span><span class="opc"></span></div>
+    <div class="lista-fila" style="background:#F8FAFC;font-weight:700"><span>Total del mes</span><span class="opc"></span><span class="opc num">${peso(neto)}</span><span class="opc num">${peso(sumar(vs, vTotal))}</span><span class="solo-movil-bloque num">${pesoCorto(sumar(vs, vTotal))}</span><span class="opc"></span><span class="opc"></span><span class="opc"></span></div>
   </div>
   <p class="ayuda">Cada servicio cuenta en su mes de facturación (si aún no tiene, en su mes de servicio). Toca una fila para ver el detalle y editarlo. Ganancia del mes: ${peso(sumar(vs, vMargen))}.</p>`
   : `<div class="tarjeta vacio"><p style="margin:0 0 .75rem">No hay servicios en ${nombreMes(mes)}.</p><button class="btn cta" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Agregar la primera</button></div>`}`;
