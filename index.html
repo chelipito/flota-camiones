@@ -576,7 +576,7 @@ const SUPA_URL = 'https://fclxmlzzskweqwhnpfkq.supabase.co';
 const SUPA_KEY = 'sb_publishable_2lQAFZZeF4jENv9qJwrXjw_v-vBxInw'; // clave pública
 const WSP_NUMERO = '+1 555 643 5085'; // número de WhatsApp al que se manda el horómetro (solo para mostrarlo)
 const REAL = !!(SUPA_URL && SUPA_KEY) && !new URLSearchParams(location.search).has('local'); // ?local = plan B: todo en el navegador
-const VERSION = '52'; // se muestra en Configuración; súbela con cada cambio publicado
+const VERSION = '53'; // se muestra en Configuración; súbela con cada cambio publicado
 S.estados = S.estados || {}; // validaciones del dueño sobre los registros que llegan de Supabase
 
 /* Inicio de sesión (Supabase Auth). Los usuarios se crean en Supabase → Authentication → Users */
@@ -1084,7 +1084,7 @@ VISTAS.finanzas = (_, q) => {
   return `
   <div class="cab"><div><h1>Ventas y caja</h1><p class="sec" style="margin:0">Cuánto se vende, cuánto se cobra y cuánto queda.</p></div>
     <button class="btn chico cta no-print" onclick="dlgVenta('nuevo','${mes}')">${ic('plus')}Nuevo servicio</button></div>
-  <nav class="filtros no-print" aria-label="Secciones">${pest('caja', 'Caja')}${pest('cobrar', 'Por cobrar')}${pest('mes', 'Mes')}${pest('resumen', 'Resumen del año')}</nav>
+  <nav class="filtros no-print" aria-label="Secciones">${pest('caja', 'Caja')}${pest('cobrar', 'Por cobrar')}${pest('mes', 'Servicios')}${pest('resumen', 'Resumen del año')}</nav>
   ${cuerpo}
   <div class="acciones no-print" style="margin:4px 0 16px"><button class="btn chico" onclick="dlgImportar()">${ic('download')}Importar Excel</button>${tab === 'mes' ? `<button class="btn chico" onclick="exportarVentas('${mes}')">${ic('download')}Exportar este mes</button>` : ''}<button class="btn chico" onclick="exportarVentas()">${ic('download')}Exportar el año a Excel</button></div>`;
 };
